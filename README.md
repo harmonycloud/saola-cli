@@ -1,27 +1,32 @@
-# saola
+# Saola CLI
 
-`saola` 是 [zeus-operator](https://gitea.com/middleware-management/zeus-operator) 的命令行管理工具，用于管理中间件实例的完整生命周期：包安装、实例创建、状态查询、版本升级与资源清理。
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://go.dev/)
 
-## 特性
+**English** | [中文](README_zh.md)
 
-- **kubectl 风格** — `get`/`create`/`delete`/`describe` 等动词 + 资源类型，学习成本低
-- **交互式创建** — TUI 表单引导选择 Baseline、填写参数，无需手写 YAML
-- **中英双语** — `--lang zh|en` 切换所有命令帮助和输出信息
-- **包管理** — 打包、安装、升级、卸载中间件包（zstd 压缩 TAR 格式）
-- **实例升级** — 通过 annotation 触发 controller 执行滚动升级，支持 `--wait` 等待完成
-- **多格式输出** — `table`/`yaml`/`json`/`wide`/`name`，便于脚本集成
+The command-line tool for [OpenSaola](https://gitee.com/opensaola/opensaola) — manage middleware lifecycle on Kubernetes: package installation, instance creation, status monitoring, version upgrades, and resource cleanup.
 
-## 安装
+## Features
 
-### 从源码构建
+- **kubectl-style** — verb + resource type (`get`/`create`/`delete`/`describe`), minimal learning curve
+- **Interactive creation** — TUI form guides baseline selection and parameter input, no manual YAML needed
+- **Bilingual** — `--lang zh|en` switches all help text and output messages
+- **Package management** — build, install, upgrade, and uninstall middleware packages (zstd-compressed TAR)
+- **Instance upgrades** — annotation-driven rolling upgrades with `--wait` for completion
+- **Multiple output formats** — `table`/`yaml`/`json`/`wide`/`name` for easy scripting
+
+## Installation
+
+### Build from source
 
 ```bash
-git clone https://gitea.com/middleware-management/saola-cli.git
+git clone https://gitee.com/opensaola/saola-cli.git
 cd saola-cli
 make build
 ```
 
-构建产物在 `bin/saola`，拷贝到 `$PATH` 即可使用：
+The binary is at `bin/saola`. Copy it to your `$PATH`:
 
 ```bash
 cp bin/saola /usr/local/bin/
@@ -30,165 +35,167 @@ cp bin/saola /usr/local/bin/
 ### go install
 
 ```bash
-go install gitea.com/middleware-management/saola-cli/cmd/saola@latest
+go install gitee.com/opensaola/saola-cli/cmd/saola@latest
 ```
 
-## 快速上手
+## Quick Start
 
 ```bash
-# 1. 安装中间件包
+# 1. Install a middleware package
 saola install ./redis-pkg -n middleware-operator --wait 5m
 
-# 2. 交互式创建 Middleware 和 MiddlewareOperator
+# 2. Interactively create Middleware and MiddlewareOperator
 saola create
 
-# 3. 查看实例状态
+# 3. Check instance status
 saola get middleware -n my-ns
 saola get operator -n my-ns
 
-# 4. 查看实例详情
+# 4. View instance details
 saola describe middleware my-redis -n my-ns
 
-# 5. 升级实例版本
+# 5. Upgrade instance version
 saola upgrade middleware my-redis --to-version 2.0.0 -n my-ns --wait 5m
 
-# 6. 删除实例
+# 6. Delete instance
 saola delete middleware my-redis -n my-ns
 ```
 
-## 命令参考
+## Command Reference
 
-### 顶级命令
+### Top-level Commands
 
-| 命令 | 说明 |
-|------|------|
-| `create` | 从 YAML 文件或交互式 TUI 创建 Middleware / MiddlewareOperator |
-| `get` | 列出或查看资源 |
-| `describe` | 显示资源详细信息（Spec、Status、Conditions） |
-| `delete` | 删除资源 |
-| `run` | 触发 MiddlewareAction（一次性运维操作） |
-| `upgrade` | 升级包或 Middleware / MiddlewareOperator 实例 |
-| `install` | 安装中间件包到集群 |
-| `uninstall` | 卸载中间件包 |
-| `build` | 打包本地目录为 zstd 压缩 TAR（不安装） |
-| `inspect` | 查看已安装包的内容和元数据 |
-| `version` | 显示版本信息 |
+| Command | Description |
+|---------|-------------|
+| `create` | Create Middleware / MiddlewareOperator from YAML or interactive TUI |
+| `get` | List or view resources |
+| `describe` | Show resource details (Spec, Status, Conditions) |
+| `delete` | Delete resources |
+| `run` | Trigger a MiddlewareAction (one-off operation) |
+| `upgrade` | Upgrade package or Middleware / MiddlewareOperator instances |
+| `install` | Install a middleware package to the cluster |
+| `uninstall` | Uninstall a middleware package |
+| `build` | Build a local directory into a zstd-compressed TAR (without installing) |
+| `inspect` | View installed package contents and metadata |
+| `version` | Show version information |
 
-### 资源子命令
+### Resource Subcommands
 
-以 `get` 为例，其他动词（`describe`/`delete`/`upgrade`）结构类似：
+Using `get` as an example — other verbs (`describe`/`delete`/`upgrade`) follow the same pattern:
 
-| 子命令 | 别名 | 说明 |
-|--------|------|------|
-| `get middleware [name]` | `mw` | 列出或查看 Middleware |
-| `get operator [name]` | `op` | 列出或查看 MiddlewareOperator |
-| `get action [name]` | `act` | 列出或查看 MiddlewareAction |
-| `get baseline [name]` | `bl` | 查看已安装包中的 Baseline |
-| `get package [name]` | `pkg` | 列出或查看已安装包 |
-| `get all` | - | 聚合输出 middleware + operator + action |
+| Subcommand | Alias | Description |
+|------------|-------|-------------|
+| `get middleware [name]` | `mw` | List or view Middleware instances |
+| `get operator [name]` | `op` | List or view MiddlewareOperator instances |
+| `get action [name]` | `act` | List or view MiddlewareAction instances |
+| `get baseline [name]` | `bl` | View baselines from installed packages |
+| `get package [name]` | `pkg` | List or view installed packages |
+| `get all` | - | Aggregate output of middleware + operator + action |
 
-### upgrade 子命令
+### upgrade Subcommands
 
 ```bash
-# 包升级（替换已安装的 Package Secret）
+# Package upgrade (replace installed Package Secret)
 saola upgrade <pkg-dir>
 
-# 实例升级（通过 annotation 触发 controller）
+# Instance upgrade (trigger controller via annotation)
 saola upgrade middleware <name> --to-version <version> [--baseline <bl>] [--wait 5m]
 saola upgrade operator <name>   --to-version <version> [--baseline <bl>] [--wait 5m]
 ```
 
-### run 命令
+### run Command
 
 ```bash
-# 触发 Action（如备份、恢复）
+# Trigger an Action (e.g., backup, restore)
 saola run <action-name> --middleware <mw-name> --params key1=val1,key2=val2 -n my-ns
 ```
 
-## 全局 Flags
+## Global Flags
 
-| Flag | 简写 | 默认值 | 说明 |
-|------|------|--------|------|
-| `--kubeconfig` | - | `$KUBECONFIG` 或 `~/.kube/config` | kubeconfig 文件路径 |
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--kubeconfig` | - | `$KUBECONFIG` or `~/.kube/config` | kubeconfig file path |
 | `--context` | - | - | kubeconfig context |
-| `--namespace` | `-n` | - | 目标命名空间 |
-| `--pkg-namespace` | - | `middleware-operator` | 包 Secret 所在命名空间 |
-| `--lang` | - | `zh` | 语言：`zh`（中文）/ `en`（英文） |
-| `--log-level` | - | `info` | 日志级别：`debug`/`info`/`warn`/`error` |
-| `--no-color` | - | `false` | 禁用彩色输出 |
+| `--namespace` | `-n` | - | Target namespace |
+| `--pkg-namespace` | - | `middleware-operator` | Namespace where package Secrets reside |
+| `--lang` | - | `zh` | Language: `zh` (Chinese) / `en` (English) |
+| `--no-color` | - | `false` | Disable colored output |
 
-常用资源命令还支持：
+Resource commands also support:
 
-| Flag | 简写 | 说明 |
-|------|------|------|
-| `--all-namespaces` | `-A` | 列出所有命名空间的资源 |
-| `--output` | `-o` | 输出格式：`table`/`yaml`/`json`/`wide`/`name` |
-| `--wait` | - | 等待操作完成的超时时间（如 `5m`） |
-| `--dry-run` | - | 预览变更，不实际执行 |
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--all-namespaces` | `-A` | List resources across all namespaces |
+| `--output` | `-o` | Output format: `table`/`yaml`/`json`/`wide`/`name` |
+| `--wait` | - | Timeout for waiting on operations (e.g., `5m`) |
+| `--dry-run` | - | Preview changes without executing |
 
-## 配置
+## Configuration
 
-### 环境变量
+### Environment Variables
 
-| 变量 | 说明 |
-|------|------|
-| `KUBECONFIG` | kubeconfig 文件路径 |
-| `SAOLA_NAMESPACE` | 默认命名空间 |
-| `SAOLA_PKG_NAMESPACE` | 包 Secret 命名空间（默认 `middleware-operator`） |
+| Variable | Description |
+|----------|-------------|
+| `KUBECONFIG` | kubeconfig file path |
+| `SAOLA_NAMESPACE` | Default namespace |
+| `SAOLA_PKG_NAMESPACE` | Package Secret namespace (default: `middleware-operator`) |
 
-### 优先级
+### Priority
 
-CLI Flag > 环境变量 > 默认值
+CLI Flag > Environment Variable > Default Value
 
-## 项目结构
+## Project Structure
 
 ```
 saola-cli/
-├── cmd/saola/          # 入口
+├── cmd/saola/          # Entry point
 ├── internal/
-│   ├── app/            # 根命令注册
-│   ├── cmd/            # 所有子命令实现
+│   ├── app/            # Root command registration
+│   ├── cmd/            # All subcommand implementations
 │   │   ├── action/     # MiddlewareAction
-│   │   ├── baseline/   # Baseline 查询
-│   │   ├── build/      # 包构建
-│   │   ├── create/     # 资源创建（含交互式 TUI）
-│   │   ├── delete/     # 资源删除
-│   │   ├── describe/   # 资源详情
-│   │   ├── get/        # 资源列表
-│   │   ├── inspect/    # 包检查
-│   │   ├── install/    # 包安装
-│   │   ├── middleware/  # Middleware 资源组
-│   │   ├── operator/   # MiddlewareOperator 资源组
-│   │   ├── upgrade/    # 升级
-│   │   └── ...
-│   ├── client/         # Kubernetes client 封装
-│   ├── config/         # 配置管理
-│   ├── consts/         # 项目常量
-│   ├── lang/           # 中英双语支持
-│   ├── packager/       # TAR/zstd 打包解包
-│   ├── printer/        # 输出格式化（table/yaml/json）
-│   ├── version/        # 版本信息
-│   └── waiter/         # 异步等待逻辑
+│   │   ├── baseline/   # Baseline queries
+│   │   ├── build/      # Package building
+│   │   ├── create/     # Resource creation (with interactive TUI)
+│   │   ├── delete/     # Resource deletion
+│   │   ├── describe/   # Resource details
+│   │   ├── get/        # Resource listing
+│   │   ├── inspect/    # Package inspection
+│   │   ├── install/    # Package installation
+│   │   ├── middleware/  # Middleware resource group
+│   │   ├── operator/   # MiddlewareOperator resource group
+│   │   ├── pkgcmd/     # Package management commands
+│   │   ├── upgrade/    # Upgrades
+│   │   ├── uninstall/  # Package uninstallation
+│   │   ├── run/        # Action execution
+│   │   └── version/    # Version info
+│   ├── client/         # Kubernetes client wrapper
+│   ├── config/         # Configuration management
+│   ├── consts/         # Project constants
+│   ├── lang/           # Bilingual support (zh/en)
+│   ├── packager/       # TAR/zstd packaging
+│   ├── printer/        # Output formatting (table/yaml/json)
+│   ├── version/        # Version info injection
+│   └── waiter/         # Async wait logic
 ├── Makefile
 └── go.mod
 ```
 
-## 构建与测试
+## Build & Test
 
 ```bash
-# 构建
-make build          # 编译到 bin/saola
+# Build
+make build          # compile to bin/saola
 
-# 测试
-make test           # 运行单元测试
-make lint           # go vet 静态检查
+# Test
+make test           # run unit tests
+make lint           # go vet static analysis
 
-# 其他
-make tidy           # 整理 go modules
-make clean          # 清理构建产物
+# Other
+make tidy           # tidy go modules
+make clean          # clean build artifacts
 ```
 
-版本信息通过 ldflags 注入：
+Version information is injected via ldflags:
 
 ```bash
 saola version
@@ -197,17 +204,28 @@ saola version
 # Build Date: 2026-03-31T07:46:11Z
 ```
 
-## 管理的 CRD 类型
+## Managed CRD Types
 
-saola 通过 zeus-operator 管理以下 Kubernetes 自定义资源：
+Saola manages the following Kubernetes custom resources via the [OpenSaola](https://gitee.com/opensaola/opensaola) operator:
 
-| CRD | 说明 |
-|-----|------|
-| `Middleware` | 中间件实例 |
-| `MiddlewareOperator` | Operator 实例 |
-| `MiddlewareAction` | 一次性运维操作（备份、恢复等） |
-| `MiddlewareBaseline` | Middleware 基线配置模板 |
-| `MiddlewareOperatorBaseline` | Operator 基线配置模板 |
+| CRD | Short | Description |
+|-----|-------|-------------|
+| Middleware | `mid` | Middleware instance |
+| MiddlewareOperator | `mo` | Operator instance managing a middleware type |
+| MiddlewareAction | `ma` | One-off operations (backup, restore, etc.) |
+| MiddlewareBaseline | `mb` | Default spec template for middleware |
+| MiddlewareOperatorBaseline | `mob` | Default spec template for operators |
+| MiddlewarePackage | `mp` | Packaged middleware distribution unit |
+
+## Documentation
+
+- [OpenSaola Technical Documentation](https://gitee.com/opensaola/opensaola/blob/master/docs/opensaola-technical.md)
+- [Package Authoring Guide](https://gitee.com/opensaola/opensaola/blob/master/docs/opensaola-packaging.md)
+- [Troubleshooting Guide](https://gitee.com/opensaola/opensaola/blob/master/docs/troubleshooting.md)
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon) for guidelines.
 
 ## License
 
