@@ -73,6 +73,25 @@ Build Date: <timestamp>
 
 ## 3. E2E Test Procedure
 
+### Automatic Operator Rebuild
+
+The E2E script can automatically rebuild and redeploy the opensaola operator before running tests. Set `OPENSAOLA_DIR` to the opensaola project path:
+
+```bash
+OPENSAOLA_DIR=../opensaola PKG_DIR=../dataservice-baseline/clickhouse ./scripts/e2e-test.sh
+```
+
+If `OPENSAOLA_DIR` is not set or the directory doesn't exist, the script will skip operator rebuild and assume it's already deployed.
+
+Environment variables:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENSAOLA_DIR` | `../opensaola` | Path to opensaola project (for auto-rebuild) |
+| `OPERATOR_IMG` | `opensaola:latest` | Operator image tag |
+| `PKG_DIR` | (required) | Middleware package directory |
+| `PKG_NS` | `middleware-operator` | Package namespace |
+| `NS` | `e2e-test` | Test namespace |
+
 ### Prerequisites
 
 1. **Deploy opensaola operator**:

@@ -73,6 +73,25 @@ Build Date: <timestamp>
 
 ## 3. E2E 测试流程
 
+### 自动重建 Operator
+
+E2E 脚本可以在运行测试之前自动重新构建和重新部署 opensaola operator。将 `OPENSAOLA_DIR` 设置为 opensaola 项目路径：
+
+```bash
+OPENSAOLA_DIR=../opensaola PKG_DIR=../dataservice-baseline/clickhouse ./scripts/e2e-test.sh
+```
+
+如果未设置 `OPENSAOLA_DIR` 或目录不存在，脚本将跳过 operator 重建，假设其已部署。
+
+环境变量：
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `OPENSAOLA_DIR` | `../opensaola` | opensaola 项目路径（用于自动重建） |
+| `OPERATOR_IMG` | `opensaola:latest` | Operator 镜像标签 |
+| `PKG_DIR` | （必填） | 中间件包目录 |
+| `PKG_NS` | `middleware-operator` | 包命名空间 |
+| `NS` | `e2e-test` | 测试命名空间 |
+
 ### 前置条件
 
 1. **部署 opensaola operator**：

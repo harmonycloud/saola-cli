@@ -9,6 +9,8 @@ PKG_DIR=${PKG_DIR:-}
 PKG_NS=${PKG_NS:-middleware-operator}
 NS=${NS:-e2e-test}
 SAMPLES=${SAMPLES:-./docs/e2e-samples}
+OPENSAOLA_DIR=${OPENSAOLA_DIR:-../opensaola}
+OPERATOR_IMG=${OPERATOR_IMG:-opensaola:latest}
 
 if [ -z "$PKG_DIR" ]; then
   echo "Usage: PKG_DIR=/path/to/middleware/package ./scripts/e2e-test.sh"
@@ -53,6 +55,32 @@ echo ""
 echo "=== Step 2: Create namespaces ==="
 kubectl create namespace "$PKG_NS" --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
+
+# Phase 0: Rebuild and redeploy opensaola operator
+echo ""
+echo "=== Phase 0: Rebuild and Redeploy OpenSaola Operator ==="
+
+if [ ! -d "$OPENSAOLA_DIR" ]; then
+  echo "SKIP: opensaola directory not found at $OPENSAOLA_DIR"
+  echo "Set OPENSAOLA_DIR to the opensaola project path, or deploy operator manually."
+else
+  echo "--- 0.1: Build operator image ---"
+  (cd "$OPENSAOLA_DIR" && make docker-build IMG="$OPERATOR_IMG") 2>&1 | tail -5
+
+  echo "--- 0.2: Install CRDs ---"
+  (cd "$OPENSAOLA_DIR" && make install) 2>&1 | tail -3
+
+  echo "--- 0.3: Deploy operator ---"
+  (cd "$OPENSAOLA_DIR" && make deploy IMG="$OPERATOR_IMG") 2>&1 | tail -3
+
+  echo "--- 0.4: Wait for operator ready ---"
+  kubectl wait --for=condition=available --timeout=120s \
+    deploy/opensaola-controller-manager -n opensaola-system
+
+  echo "--- 0.5: Verify operator ---"
+  kubectl get pods -n opensaola-system
+  kubectl logs -n opensaola-system deploy/opensaola-controller-manager --tail=5 2>&1 | grep -i 'error\|panic' || echo "NO ERRORS"
+fi
 
 # Phase A: Package management
 echo ""
