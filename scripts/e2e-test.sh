@@ -45,42 +45,41 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Build
-echo "=== Step 1: Build saola ==="
+# Phase 0: Rebuild everything from latest code
+echo ""
+echo "=== Phase 0: Build and Deploy ==="
+
+echo "--- 0.1: Build saola-cli ---"
 make build
 "$SAOLA" version
-
-# Create namespaces
-echo ""
-echo "=== Step 2: Create namespaces ==="
-kubectl create namespace "$PKG_NS" --dry-run=client -o yaml | kubectl apply -f -
-kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
-
-# Phase 0: Rebuild and redeploy opensaola operator
-echo ""
-echo "=== Phase 0: Rebuild and Redeploy OpenSaola Operator ==="
 
 if [ ! -d "$OPENSAOLA_DIR" ]; then
   echo "SKIP: opensaola directory not found at $OPENSAOLA_DIR"
   echo "Set OPENSAOLA_DIR to the opensaola project path, or deploy operator manually."
 else
-  echo "--- 0.1: Build operator image ---"
+  echo "--- 0.2: Build operator image ---"
   (cd "$OPENSAOLA_DIR" && make docker-build IMG="$OPERATOR_IMG") 2>&1 | tail -5
 
-  echo "--- 0.2: Install CRDs ---"
+  echo "--- 0.3: Install CRDs ---"
   (cd "$OPENSAOLA_DIR" && make install) 2>&1 | tail -3
 
-  echo "--- 0.3: Deploy operator ---"
+  echo "--- 0.4: Deploy operator ---"
   (cd "$OPENSAOLA_DIR" && make deploy IMG="$OPERATOR_IMG") 2>&1 | tail -3
 
-  echo "--- 0.4: Wait for operator ready ---"
+  echo "--- 0.5: Wait for operator ready ---"
   kubectl wait --for=condition=available --timeout=120s \
     deploy/opensaola-controller-manager -n opensaola-system
 
-  echo "--- 0.5: Verify operator ---"
+  echo "--- 0.6: Verify operator ---"
   kubectl get pods -n opensaola-system
   kubectl logs -n opensaola-system deploy/opensaola-controller-manager --tail=5 2>&1 | grep -i 'error\|panic' || echo "NO ERRORS"
 fi
+
+# Create namespaces
+echo ""
+echo "=== Step 1: Create namespaces ==="
+kubectl create namespace "$PKG_NS" --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
 
 # Phase A: Package management
 echo ""
