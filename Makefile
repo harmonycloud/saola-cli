@@ -7,7 +7,7 @@ LDFLAGS    := -s -w \
 	-X $(MODULE)/internal/version.GitCommit=$(GIT_COMMIT) \
 	-X $(MODULE)/internal/version.BuildDate=$(BUILD_DATE)
 
-.PHONY: build clean tidy lint test fmt help
+.PHONY: build clean tidy lint test test-e2e fmt help
 
 ## build: compile saola binary into bin/
 build:
@@ -28,6 +28,11 @@ lint:
 ## test: run unit tests
 test:
 	go test ./... -count=1
+
+## test-e2e: run E2E tests (requires PKG_DIR, e.g., PKG_DIR=../dataservice-baseline/clickhouse make test-e2e)
+test-e2e:
+	@test -n "$(PKG_DIR)" || { echo "PKG_DIR is required. Example: PKG_DIR=../dataservice-baseline/clickhouse make test-e2e"; exit 1; }
+	./scripts/e2e-test.sh
 
 ## fmt: format Go source files
 fmt:

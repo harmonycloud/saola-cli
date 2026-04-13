@@ -75,9 +75,19 @@ Build Date: <timestamp>
 
 ### Prerequisites
 
-- A running Kubernetes cluster with `kubectl` access
-- OpenSaola operator deployed (see [OpenSaola docs](https://gitee.com/opensaola/opensaola))
-- A ClickHouse package directory (from [dataservice-baseline](https://gitee.com/opensaola/dataservice-baseline))
+1. **Deploy opensaola operator**:
+   ```bash
+   cd ../opensaola
+   make docker-build IMG=opensaola:test
+   make install
+   make deploy IMG=opensaola:test
+   kubectl wait --for=condition=available --timeout=120s deploy/opensaola-controller-manager -n opensaola-system
+   ```
+   For detailed instructions, see the [opensaola Testing Guide](https://gitee.com/opensaola/opensaola/blob/master/docs/testing-guide.md#build-and-deploy-for-testing).
+
+2. **A middleware package directory** (e.g., `../dataservice-baseline/clickhouse`)
+
+3. **kubectl** configured with cluster access
 
 ### Environment Setup
 

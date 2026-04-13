@@ -75,9 +75,19 @@ Build Date: <timestamp>
 
 ### 前置条件
 
-- 可用的 Kubernetes 集群，且 `kubectl` 已配置访问权限
-- OpenSaola operator 已部署（参见 [OpenSaola 文档](https://gitee.com/opensaola/opensaola)）
-- ClickHouse 包目录（来自 [dataservice-baseline](https://gitee.com/opensaola/dataservice-baseline)）
+1. **部署 opensaola operator**：
+   ```bash
+   cd ../opensaola
+   make docker-build IMG=opensaola:test
+   make install
+   make deploy IMG=opensaola:test
+   kubectl wait --for=condition=available --timeout=120s deploy/opensaola-controller-manager -n opensaola-system
+   ```
+   详细说明请参见 [opensaola 测试指南](https://gitee.com/opensaola/opensaola/blob/master/docs/testing-guide_zh.md#构建和部署进行手动测试)。
+
+2. **中间件包目录**（例如 `../dataservice-baseline/clickhouse`）
+
+3. **kubectl** 已配置集群访问权限
 
 ### 环境准备
 
