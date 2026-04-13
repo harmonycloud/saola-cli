@@ -220,6 +220,7 @@ Saola manages the following Kubernetes custom resources via the [OpenSaola](http
 ## Documentation
 
 - [Usage Guide](docs/saola-cli-usage.md) | [Usage Guide (English)](docs/saola-cli-usage_en.md)
+- [Testing Guide](docs/testing-guide.md) | [Testing Guide (Chinese)](docs/testing-guide_zh.md)
 - [OpenSaola Technical Documentation](https://gitee.com/opensaola/opensaola/blob/master/docs/opensaola-technical.md)
 - [Package Authoring Guide](https://gitee.com/opensaola/opensaola/blob/master/docs/opensaola-packaging.md)
 - [Troubleshooting Guide](https://gitee.com/opensaola/opensaola/blob/master/docs/troubleshooting.md)

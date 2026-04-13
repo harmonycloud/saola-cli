@@ -1,0 +1,16 @@
+apiVersion: middleware.cn/v1
+kind: MiddlewareOperator
+metadata:
+  name: clickhouse-operator
+  namespace: e2e-test
+  labels:
+    middleware.cn/component: ClickHouse
+    middleware.cn/packagename: clickhouse-0.25.5-1.0.0
+spec:
+  baseline: clickhouse-operator-standard
+  operatorBaseline:
+    name: clickhouse-operator-standard
+    gvkName: v1
+  globe:
+    repository: "docker.io"
+    project: "altinity"

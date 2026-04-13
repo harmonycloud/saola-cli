@@ -220,6 +220,7 @@ Saola 通过 [OpenSaola](https://gitee.com/opensaola/opensaola) Operator 管理�
 ## 文档
 
 - [使用文档](docs/saola-cli-usage.md) | [Usage Guide (English)](docs/saola-cli-usage_en.md)
+- [测试指南](docs/testing-guide_zh.md) | [Testing Guide (English)](docs/testing-guide.md)
 - [OpenSaola 技术文档](https://gitee.com/opensaola/opensaola/blob/master/docs/opensaola-technical.md)
 - [包适配指南](https://gitee.com/opensaola/opensaola/blob/master/docs/opensaola-packaging.md)
 - [故障排查指南](https://gitee.com/opensaola/opensaola/blob/master/docs/troubleshooting_zh.md)

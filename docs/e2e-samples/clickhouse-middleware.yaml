@@ -1,0 +1,27 @@
+apiVersion: middleware.cn/v1
+kind: Middleware
+metadata:
+  name: my-clickhouse
+  namespace: e2e-test
+  labels:
+    middleware.cn/component: ClickHouse
+    middleware.cn/packagename: clickhouse-0.25.5-1.0.0
+spec:
+  baseline: clickhouse-2shards-2replicas
+  operatorBaseline:
+    name: clickhouse-operator-standard
+    gvkName: v1
+  necessary:
+    repository: "docker.io/clickhouse"
+    version: "24.8"
+    resource:
+      clickhouse:
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        volume:
+          size: 1
+          storageClass: "standard"
