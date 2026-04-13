@@ -141,6 +141,11 @@ if [ -f "$SAMPLES/clickhouse-operator.yaml" ]; then
   echo "--- B4a: Verify operator pods ---"
   OP_READY=$(kubectl get pods -n "$NS" --no-headers 2>/dev/null | grep -c Running || echo 0)
   echo "Operator pods running: $OP_READY"
+  if [ "$OP_READY" -lt 1 ]; then
+    echo "FAIL: No operator pods running"
+    kubectl describe pods -n "$NS" 2>/dev/null || true
+    exit 1
+  fi
 else
   echo "SKIP: Phase B — no operator sample at $SAMPLES/clickhouse-operator.yaml"
 fi
@@ -208,7 +213,9 @@ if [ -f "$SAMPLES/clickhouse-middleware.yaml" ]; then
       break
     fi
     if [ "$i" -eq 36 ]; then
-      echo "WARNING: Middleware did not return to Available after upgrade"
+      echo "FAIL: Middleware did not return to Available after upgrade"
+      kubectl get mid my-clickhouse -n "$NS" -o yaml 2>/dev/null || true
+      exit 1
     fi
     sleep 5
   done
@@ -233,10 +240,18 @@ else
 fi
 
 echo "--- D5.2: Get non-existent resource ---"
-"$SAOLA" describe middleware nonexistent -n "$NS" 2>&1 || echo "PASS: Non-existent resource returned error"
+if ! "$SAOLA" describe middleware nonexistent -n "$NS" 2>&1; then
+  echo "PASS: Non-existent resource correctly returned error"
+else
+  echo "FAIL: Non-existent resource should have returned error"
+fi
 
 echo "--- D5.3: Inspect non-existent package ---"
-"$SAOLA" inspect nonexistent --pkg-namespace "$PKG_NS" 2>&1 || echo "PASS: Non-existent package returned error"
+if ! "$SAOLA" inspect nonexistent --pkg-namespace "$PKG_NS" 2>&1; then
+  echo "PASS: Non-existent package correctly returned error"
+else
+  echo "FAIL: Non-existent package should have returned error"
+fi
 
 echo ""
 echo "========================================="
