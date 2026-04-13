@@ -8,9 +8,6 @@ metadata:
     middleware.cn/packagename: clickhouse-0.25.5-1.0.0
 spec:
   baseline: clickhouse-operator-standard
-  operatorBaseline:
-    name: clickhouse-operator-standard
-    gvkName: v1
   globe:
     repository: "docker.io"
     project: "altinity"
