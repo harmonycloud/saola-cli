@@ -22,6 +22,7 @@ import (
 )
 
 func TestFormatAge(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		d    time.Duration
@@ -36,6 +37,7 @@ func TestFormatAge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := FormatAge(tt.d)
 			if got != tt.want {
 				t.Errorf("FormatAge(%v) = %q, want %q", tt.d, got, tt.want)
@@ -45,6 +47,7 @@ func TestFormatAge(t *testing.T) {
 }
 
 func TestTruncate(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		s    string
@@ -58,6 +61,7 @@ func TestTruncate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := Truncate(tt.s, tt.max)
 			if got != tt.want {
 				t.Errorf("Truncate(%q, %d) = %q, want %q", tt.s, tt.max, got, tt.want)
@@ -67,6 +71,7 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestFormatLabelsShort(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		labels map[string]string
@@ -94,6 +99,7 @@ func TestFormatLabelsShort(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := FormatLabelsShort(tt.labels, tt.keys)
 			if got != tt.want {
 				t.Errorf("FormatLabelsShort() = %q, want %q", got, tt.want)

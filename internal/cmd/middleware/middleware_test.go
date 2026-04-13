@@ -399,3 +399,90 @@ func TestMiddlewareDescribe_NotFound(t *testing.T) {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// upgrade tests
+// upgrade 相关测试
+// ---------------------------------------------------------------------------
+
+// TestMiddlewareUpgrade_Success verifies that an existing Middleware is patched
+// with upgrade annotations when --to-version is supplied.
+//
+// TestMiddlewareUpgrade_Success 验证存在的 Middleware 在指定 --to-version 时
+// 能被成功打上升级 annotation。
+func TestMiddlewareUpgrade_Success(t *testing.T) {
+	mw := &zeusv1.Middleware{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-redis",
+			Namespace: "default",
+		},
+		Spec: zeusv1.MiddlewareSpec{Baseline: "redis-7"},
+	}
+
+	o := &UpgradeOptions{
+		Config:    newCfg("default"),
+		Name:      "my-redis",
+		Namespace: "default",
+		ToVersion: "7.2.1",
+		Client:    newFakeClient(mw),
+	}
+
+	if err := o.Run(context.Background()); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
+// TestMiddlewareUpgrade_NotFound verifies that upgrading a non-existent
+// Middleware returns an error.
+//
+// TestMiddlewareUpgrade_NotFound 验证对不存在的 Middleware 执行升级时返回错误。
+func TestMiddlewareUpgrade_NotFound(t *testing.T) {
+	o := &UpgradeOptions{
+		Config:    newCfg("default"),
+		Name:      "ghost-redis",
+		Namespace: "default",
+		ToVersion: "7.2.1",
+		Client:    newFakeClient(),
+	}
+
+	err := o.Run(context.Background())
+	if err == nil {
+		t.Fatal("expected error for missing middleware, got nil")
+	}
+	if !strings.Contains(err.Error(), "get middleware") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// TestMiddlewareUpgrade_AlreadyInProgress verifies that triggering an upgrade
+// while another upgrade is pending returns an error.
+//
+// TestMiddlewareUpgrade_AlreadyInProgress 验证在已有升级进行中时再次触发升级会返回错误。
+func TestMiddlewareUpgrade_AlreadyInProgress(t *testing.T) {
+	mw := &zeusv1.Middleware{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-redis",
+			Namespace: "default",
+			Annotations: map[string]string{
+				zeusv1.LabelUpdate: "6.0.0",
+			},
+		},
+		Spec: zeusv1.MiddlewareSpec{Baseline: "redis-7"},
+	}
+
+	o := &UpgradeOptions{
+		Config:    newCfg("default"),
+		Name:      "my-redis",
+		Namespace: "default",
+		ToVersion: "7.2.1",
+		Client:    newFakeClient(mw),
+	}
+
+	err := o.Run(context.Background())
+	if err == nil {
+		t.Fatal("expected error for in-progress upgrade, got nil")
+	}
+	if !strings.Contains(err.Error(), "upgrade already in progress") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}

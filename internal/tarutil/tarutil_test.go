@@ -58,6 +58,7 @@ type tarEntry struct {
 }
 
 func TestReadTarInfo_ValidTar(t *testing.T) {
+	t.Parallel()
 	data := makeTar(t, []tarEntry{
 		{name: "pkg/metadata.yaml", content: []byte("name: test")},
 		{name: "pkg/baselines/default.yaml", content: []byte("version: 1")},
@@ -79,6 +80,7 @@ func TestReadTarInfo_ValidTar(t *testing.T) {
 }
 
 func TestReadTarInfo_SingleComponent(t *testing.T) {
+	t.Parallel()
 	// Entry without "/" — should use the name as-is (len(dirs) < 2 branch).
 	data := makeTar(t, []tarEntry{
 		{name: "standalone.txt", content: []byte("hello")},
@@ -94,6 +96,7 @@ func TestReadTarInfo_SingleComponent(t *testing.T) {
 }
 
 func TestReadTarInfo_MaxFileSize(t *testing.T) {
+	t.Parallel()
 	// Create a header that claims size > 100MB but provide minimal content.
 	// ReadTarInfo should reject based on header size before reading body.
 	var buf bytes.Buffer
@@ -120,6 +123,7 @@ func TestReadTarInfo_MaxFileSize(t *testing.T) {
 }
 
 func TestReadTarInfo_MaxFileCount(t *testing.T) {
+	t.Parallel()
 	// Build a tar with maxFileCount+1 entries.
 	entries := make([]tarEntry, maxFileCount+1)
 	for i := range entries {
@@ -144,6 +148,7 @@ func TestReadTarInfo_MaxFileCount(t *testing.T) {
 }
 
 func TestTarInfo_ReadFile_Found(t *testing.T) {
+	t.Parallel()
 	info := &TarInfo{
 		Files: map[string][]byte{
 			"baselines/default.yaml": []byte("content"),
@@ -159,6 +164,7 @@ func TestTarInfo_ReadFile_Found(t *testing.T) {
 }
 
 func TestTarInfo_ReadFile_NotFound(t *testing.T) {
+	t.Parallel()
 	info := &TarInfo{
 		Files: map[string][]byte{
 			"baselines/default.yaml": []byte("content"),

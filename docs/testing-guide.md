@@ -36,6 +36,7 @@ go test ./internal/lang/... -v
 | `internal/cmd/create` | Yes | Resource creation |
 | `internal/cmd/baseline` | Yes | Baseline queries |
 | `internal/cmd/action` | Yes | Action commands |
+| `cmd/saola` | No | Main entrypoint |
 | `internal/client` | No | Kubernetes client wrapper (requires cluster) |
 | `internal/app` | No | Root command registration |
 | `internal/consts` | No | Constants only |
@@ -220,7 +221,7 @@ kubectl delete namespace $NS
 Run the following before submitting a PR:
 
 ```bash
-make lint     # go vet static analysis
+make lint     # go vet (basic correctness checks)
 make test     # unit tests
 make build    # verify compilation
 ```
