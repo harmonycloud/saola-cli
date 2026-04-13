@@ -72,7 +72,11 @@ else
 
   echo "--- 0.6: Verify operator ---"
   kubectl get pods -n opensaola-system
-  kubectl logs -n opensaola-system deploy/opensaola-controller-manager --tail=5 2>&1 | grep -i 'error\|panic' || echo "NO ERRORS"
+  ERRORS=$(kubectl logs -n opensaola-system deploy/opensaola-controller-manager --tail=20 2>&1 | grep -i 'error\|panic' || true)
+  if [ -n "$ERRORS" ]; then
+    echo "WARNING: Operator logs contain errors:"
+    echo "$ERRORS"
+  fi
 fi
 
 # Create namespaces
@@ -133,6 +137,10 @@ if [ -f "$SAMPLES/clickhouse-operator.yaml" ]; then
   echo "--- B4: Verify ---"
   "$SAOLA" get operator -n "$NS"
   kubectl get pods -n "$NS"
+
+  echo "--- B4a: Verify operator pods ---"
+  OP_READY=$(kubectl get pods -n "$NS" --no-headers 2>/dev/null | grep -c Running || echo 0)
+  echo "Operator pods running: $OP_READY"
 else
   echo "SKIP: Phase B — no operator sample at $SAMPLES/clickhouse-operator.yaml"
 fi
@@ -163,8 +171,47 @@ if [ -f "$SAMPLES/clickhouse-middleware.yaml" ]; then
   "$SAOLA" get middleware -n "$NS"
   "$SAOLA" get all -n "$NS"
   kubectl get pods -n "$NS"
+
+  echo "--- C3a: Verify actual workload health ---"
+  CH_RUNNING=$(kubectl get pods -n "$NS" -l clickhouse.altinity.com/chi=my-clickhouse --no-headers 2>/dev/null | grep -c Running || echo 0)
+  CH_TOTAL=$(kubectl get pods -n "$NS" -l clickhouse.altinity.com/chi=my-clickhouse --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  echo "ClickHouse pods: $CH_RUNNING/$CH_TOTAL Running"
+  if [ "$CH_RUNNING" -lt 1 ]; then
+    echo "FAIL: No ClickHouse pods running"
+    kubectl get pods -n "$NS" 2>/dev/null || true
+    exit 1
+  fi
+  CHI_STATUS=$(kubectl get chi my-clickhouse -n "$NS" -o jsonpath='{.status.status}' 2>/dev/null || echo "unknown")
+  echo "ClickHouseInstallation status: $CHI_STATUS"
+  SVC_COUNT=$(kubectl get svc -n "$NS" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  PVC_COUNT=$(kubectl get pvc -n "$NS" --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  echo "Services: $SVC_COUNT, PVCs: $PVC_COUNT"
 else
   echo "SKIP: Phase C — no middleware sample at $SAMPLES/clickhouse-middleware.yaml"
+fi
+
+# Phase C.5: Upgrade test
+if [ -f "$SAMPLES/clickhouse-middleware.yaml" ]; then
+  echo ""
+  echo "=== Phase C.5: Middleware Upgrade Test ==="
+  echo "--- C5.1: Annotate to trigger upgrade ---"
+  kubectl annotate mid my-clickhouse -n "$NS" middleware.cn/update=true --overwrite 2>/dev/null || true
+  echo "--- C5.2: Verify state transitions ---"
+  sleep 5
+  STATE=$(kubectl get mid my-clickhouse -n "$NS" -o jsonpath='{.status.state}' 2>/dev/null)
+  echo "State after annotation: $STATE"
+  echo "--- C5.3: Wait for Available again (max 3min) ---"
+  for i in $(seq 1 36); do
+    STATE=$(kubectl get mid my-clickhouse -n "$NS" -o jsonpath='{.status.state}' 2>/dev/null)
+    if [ "$STATE" = "Available" ]; then
+      echo "Available again at attempt $i"
+      break
+    fi
+    if [ "$i" -eq 36 ]; then
+      echo "WARNING: Middleware did not return to Available after upgrade"
+    fi
+    sleep 5
+  done
 fi
 
 # Phase D: Output formats
@@ -174,6 +221,22 @@ echo "=== Phase D: Output Formats ==="
 "$SAOLA" get middleware -n "$NS" -o yaml 2>&1 | head -10
 "$SAOLA" get operator -n "$NS" -o json 2>&1 | head -10
 "$SAOLA" --lang en get all -n "$NS"
+
+# Phase D.5: Error scenarios
+echo ""
+echo "=== Phase D.5: Error Scenarios ==="
+echo "--- D5.1: Duplicate package install ---"
+if "$SAOLA" install "$PKG_DIR" --pkg-namespace "$PKG_NS" 2>&1 | grep -qi 'already exists\|error'; then
+  echo "PASS: Duplicate install correctly rejected"
+else
+  echo "WARNING: Duplicate install did not return expected error"
+fi
+
+echo "--- D5.2: Get non-existent resource ---"
+"$SAOLA" describe middleware nonexistent -n "$NS" 2>&1 || echo "PASS: Non-existent resource returned error"
+
+echo "--- D5.3: Inspect non-existent package ---"
+"$SAOLA" inspect nonexistent --pkg-namespace "$PKG_NS" 2>&1 || echo "PASS: Non-existent package returned error"
 
 echo ""
 echo "========================================="
