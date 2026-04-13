@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package app
 
 import (
@@ -29,10 +45,10 @@ func NewRootCmd() *cobra.Command {
 
 	root := &cobra.Command{
 		Use:   "saola",
-		Short: lang.T("saola-cli — zeus-operator 中间件包管理命令行工具", "saola-cli — CLI companion for zeus-operator middleware management"),
+		Short: lang.T("saola-cli — OpenSaola 中间件包管理命令行工具", "saola-cli — CLI companion for OpenSaola middleware management"),
 		Long: lang.T(
-			`saola 是 zeus-operator 的命令行伴侣工具，支持中间件包的打包与发布、Middleware 和 MiddlewareOperator 自定义资源管理、触发 Action 以及查询 Baseline。`,
-			`saola is the CLI companion for zeus-operator. It allows you to pack and publish middleware packages, manage Middleware and MiddlewareOperator custom resources, trigger actions, and query baselines.`,
+			`saola 是 OpenSaola 的命令行伴侣工具，支持中间件包的打包与发布、Middleware 和 MiddlewareOperator 自定义资源管理、触发 Action 以及查询 Baseline。`,
+			`saola is the CLI companion for OpenSaola. It allows you to pack and publish middleware packages, manage Middleware and MiddlewareOperator custom resources, trigger actions, and query baselines.`,
 		),
 		SilenceUsage:  true,
 		SilenceErrors: true,

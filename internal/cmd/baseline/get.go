@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package baseline
 
 import (
@@ -9,7 +25,7 @@ import (
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"gitee.com/opensaola/saola-cli/internal/printer"
-	"gitee.com/opensaola/opensaola/pkg/service/packages"
+	"gitee.com/opensaola/saola-cli/internal/packages"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )

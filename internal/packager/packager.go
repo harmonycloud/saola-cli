@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package packager
 
 import (
@@ -8,7 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitee.com/opensaola/opensaola/pkg/service/packages"
+	"gitee.com/opensaola/saola-cli/internal/packages"
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,11 +36,11 @@ type App struct {
 	DeprecatedVersion []string `yaml:"deprecatedVersion" json:"deprecatedVersion"`
 }
 
-// Metadata mirrors packages.Metadata from zeus-operator for local use.
-// Field layout must stay in sync with zeus-operator/pkg/service/packages/packages.go.
+// Metadata mirrors packages.Metadata from opensaola for local use.
+// Field layout must stay in sync with opensaola/internal/service/packages/packages.go.
 //
-// Metadata 镜像自 zeus-operator 的 packages.Metadata，用于本地解析。
-// 字段布局必须与 zeus-operator/pkg/service/packages/packages.go 保持一致。
+// Metadata 镜像自 opensaola 的 packages.Metadata，用于本地解析。
+// 字段布局必须与 opensaola/internal/service/packages/packages.go 保持一致。
 type Metadata struct {
 	Name        string `yaml:"name"  json:"name"`
 	Version     string `yaml:"version" json:"version"`
@@ -61,9 +77,9 @@ func (m *Metadata) Validate() error {
 //	  crds/
 //
 // The TAR root directory prefix is set to "<name>-<version>/" so that
-// zeus-operator's ReadTarInfo can strip the first path component correctly.
+// opensaola's ReadTarInfo can strip the first path component correctly.
 //
-// 预期目录结构见上。TAR 根目录前缀设置为 "<name>-<version>/"，以便 zeus-operator 的 ReadTarInfo 正确剥离首层路径。
+// 预期目录结构见上。TAR 根目录前缀设置为 "<name>-<version>/"，以便 opensaola 的 ReadTarInfo 正确剥离首层路径。
 func PackDir(dir string) (data []byte, meta *Metadata, err error) {
 	// 1. Read and validate metadata.
 	metaPath := filepath.Join(dir, "metadata.yaml")
@@ -143,7 +159,7 @@ func PackDir(dir string) (data []byte, meta *Metadata, err error) {
 		return nil, nil, fmt.Errorf("close TAR writer: %w", err)
 	}
 
-	// 3. Compress with zstd via zeus-operator's Compress().
+	// 3. Compress with zstd via opensaola's Compress().
 	compressed, _, err := packages.Compress(tarBuf.Bytes())
 	if err != nil {
 		return nil, nil, fmt.Errorf("compress: %w", err)

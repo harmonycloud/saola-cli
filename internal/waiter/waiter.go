@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package waiter
 
 import (
@@ -5,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"gitee.com/opensaola/opensaola/pkg/service/consts"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,12 +46,12 @@ func WaitForInstall(ctx context.Context, cli client.Client, name, namespace stri
 			return fmt.Errorf("get secret %q: %w", name, err)
 		}
 
-		if secret.Labels[consts.LabelEnabled] == "true" {
+		if secret.Labels[zeusv1.LabelEnabled] == "true" {
 			return nil
 		}
 
 		if secret.Annotations != nil {
-			if errMsg := secret.Annotations[consts.AnnotationInstallError]; errMsg != "" {
+			if errMsg := secret.Annotations[zeusv1.AnnotationInstallError]; errMsg != "" {
 				return fmt.Errorf("package %q install failed: %s", name, errMsg)
 			}
 		}
@@ -67,8 +83,8 @@ func WaitForUninstall(ctx context.Context, cli client.Client, name, namespace st
 			return fmt.Errorf("get secret %q: %w", name, err)
 		}
 
-		enabled := secret.Labels[consts.LabelEnabled] == "true"
-		_, hasUninstallAnnotation := secret.Annotations[consts.LabelUnInstall]
+		enabled := secret.Labels[zeusv1.LabelEnabled] == "true"
+		_, hasUninstallAnnotation := secret.Annotations[zeusv1.LabelUnInstall]
 
 		// Uninstall is complete when the operator has cleared the annotation and
 		// left enabled=false (package is dormant / removed).

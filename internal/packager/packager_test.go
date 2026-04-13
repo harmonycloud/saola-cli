@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package packager
 
 import (
@@ -9,8 +25,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitee.com/opensaola/opensaola/pkg/service/packages"
-	"gitee.com/opensaola/opensaola/pkg/tools"
+	"gitee.com/opensaola/saola-cli/internal/packages"
+	"gitee.com/opensaola/saola-cli/internal/tarutil"
 )
 
 // makeDir creates a temporary directory populated with the given files (relative path → content).
@@ -65,9 +81,9 @@ func tarEntryNames(t *testing.T, rawTar []byte) []string {
 }
 
 // TestPackDir_NormalCase verifies that a well-formed package directory is packed, decompressed,
-// and parsed correctly by zeus-operator's packages.DeCompress and tools.ReadTarInfo.
+// and parsed correctly by opensaola's packages.DeCompress and tarutil.ReadTarInfo.
 //
-// TestPackDir_NormalCase 验证正常包目录可以被打包，并由 zeus-operator 工具正确解压和解析。
+// TestPackDir_NormalCase 验证正常包目录可以被打包，并由 opensaola 工具正确解压和解析。
 func TestPackDir_NormalCase(t *testing.T) {
 	dir := makeDir(t, map[string]string{
 		"metadata.yaml":              "name: myapp\nversion: \"1.0.0\"\nowner: team\ntype: middleware\n",
@@ -86,15 +102,15 @@ func TestPackDir_NormalCase(t *testing.T) {
 		t.Errorf("metadata mismatch: got name=%q version=%q", meta.Name, meta.Version)
 	}
 
-	// Decompress with zeus-operator's DeCompress, then parse TAR structure.
+	// Decompress with opensaola's DeCompress, then parse TAR structure.
 	//
-	// 用 zeus-operator 的 DeCompress 解压后，解析 TAR 结构。
+	// 用 opensaola 的 DeCompress 解压后，解析 TAR 结构。
 	raw, err := packages.DeCompress(compressed)
 	if err != nil {
 		t.Fatalf("DeCompress failed: %v", err)
 	}
 
-	info, err := tools.ReadTarInfo(raw)
+	info, err := tarutil.ReadTarInfo(raw)
 	if err != nil {
 		t.Fatalf("ReadTarInfo failed: %v", err)
 	}
@@ -184,7 +200,7 @@ func TestPackDir_EmptyDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeCompress failed: %v", err)
 	}
-	info, err := tools.ReadTarInfo(raw)
+	info, err := tarutil.ReadTarInfo(raw)
 	if err != nil {
 		t.Fatalf("ReadTarInfo failed: %v", err)
 	}

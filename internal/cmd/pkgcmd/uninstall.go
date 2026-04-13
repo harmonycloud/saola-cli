@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package pkgcmd
 
 import (
@@ -10,7 +26,7 @@ import (
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"gitee.com/opensaola/saola-cli/internal/waiter"
-	"gitee.com/opensaola/opensaola/pkg/service/consts"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -40,9 +56,9 @@ func NewCmdUninstall(cfg *config.Config) *cobra.Command {
 		Short: lang.T("卸载中间件包", "Uninstall a middleware package"),
 		Long: lang.T(
 			`在包对应的 Secret 上添加卸载注解。
-zeus-operator 检测到注解后会自动卸载该包。`,
+OpenSaola 检测到注解后会自动卸载该包。`,
 			`Add the uninstall annotation to the package Secret.
-zeus-operator will pick up the annotation and uninstall the package.`,
+OpenSaola will pick up the annotation and uninstall the package.`,
 		),
 		Example: `  saola package uninstall redis-v1
   saola package uninstall redis-v1 --wait 5m`,
@@ -80,7 +96,7 @@ func (o *UninstallOptions) Run(ctx context.Context) error {
 	if secret.Annotations == nil {
 		secret.Annotations = make(map[string]string)
 	}
-	secret.Annotations[consts.LabelUnInstall] = "true"
+	secret.Annotations[zeusv1.LabelUnInstall] = "true"
 	if err = cli.Patch(ctx, secret, patch); err != nil {
 		return fmt.Errorf("patch Secret: %w", err)
 	}

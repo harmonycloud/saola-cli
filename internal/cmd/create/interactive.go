@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package create
 
 import (
@@ -12,11 +28,10 @@ import (
 	"strings"
 
 	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
-	zeusk8s "gitee.com/opensaola/opensaola/pkg/k8s"
-	"gitee.com/opensaola/opensaola/pkg/service/consts"
-	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
-	"gitee.com/opensaola/opensaola/pkg/service/packages"
 	"gitee.com/opensaola/saola-cli/internal/client"
+	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
+	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
+	"gitee.com/opensaola/saola-cli/internal/packages"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/charmbracelet/huh"
@@ -156,8 +171,8 @@ func runInteractiveMiddleware(ctx context.Context, cfg *config.Config, cli sigs.
 	packages.SetDataNamespace(cfg.PkgNamespace)
 
 	secrets, err := zeusk8s.GetSecrets(ctx, cli, cfg.PkgNamespace, sigs.MatchingLabels{
-		consts.LabelProject: consts.ProjectZeusOperator,
-		consts.LabelEnabled: "true",
+		zeusv1.LabelProject: saolaconsts.ProjectOpenSaola,
+		zeusv1.LabelEnabled: "true",
 	})
 	if err != nil {
 		return fmt.Errorf("list package secrets: %w", err)
@@ -180,8 +195,8 @@ func runInteractiveMiddleware(ctx context.Context, cfg *config.Config, cli sigs.
 				Name:              bl.Name,
 				DisplayLabel:      label,
 				PackageSecretName: secret.Name,
-				PackageVersion:    secret.Labels[consts.LabelPackageVersion],
-				Component:         secret.Labels[consts.LabelComponent],
+				PackageVersion:    secret.Labels[zeusv1.LabelPackageVersion],
+				Component:         secret.Labels[zeusv1.LabelComponent],
 				Baseline:          bl,
 			})
 		}
@@ -551,9 +566,9 @@ func runInteractiveMiddleware(ctx context.Context, cfg *config.Config, cli sigs.
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				consts.LabelPackageName:    selected.PackageSecretName,
-				consts.LabelPackageVersion: selected.PackageVersion,
-				consts.LabelComponent:      selected.Component,
+				zeusv1.LabelPackageName:    selected.PackageSecretName,
+				zeusv1.LabelPackageVersion: selected.PackageVersion,
+				zeusv1.LabelComponent:      selected.Component,
 				saolaconsts.LabelDefinition:            selected.Name,
 			},
 		},
@@ -591,7 +606,7 @@ func runInteractiveMiddleware(ctx context.Context, cfg *config.Config, cli sigs.
 		return nil
 	}
 
-	if err = zeusk8s.CreateMidddleware(ctx, cli, mw); err != nil {
+	if err = zeusk8s.CreateMiddleware(ctx, cli, mw); err != nil {
 		return fmt.Errorf("create middleware %s/%s: %w", namespace, name, err)
 	}
 
@@ -615,8 +630,8 @@ func runInteractiveOperator(ctx context.Context, cfg *config.Config, cli sigs.Cl
 	packages.SetDataNamespace(cfg.PkgNamespace)
 
 	secrets, err := zeusk8s.GetSecrets(ctx, cli, cfg.PkgNamespace, sigs.MatchingLabels{
-		consts.LabelProject: consts.ProjectZeusOperator,
-		consts.LabelEnabled: "true",
+		zeusv1.LabelProject: saolaconsts.ProjectOpenSaola,
+		zeusv1.LabelEnabled: "true",
 	})
 	if err != nil {
 		return fmt.Errorf("list package secrets: %w", err)
@@ -643,8 +658,8 @@ func runInteractiveOperator(ctx context.Context, cfg *config.Config, cli sigs.Cl
 				Name:              bl.Name,
 				DisplayLabel:      label,
 				PackageSecretName: secret.Name,
-				PackageVersion:    secret.Labels[consts.LabelPackageVersion],
-				Component:         secret.Labels[consts.LabelComponent],
+				PackageVersion:    secret.Labels[zeusv1.LabelPackageVersion],
+				Component:         secret.Labels[zeusv1.LabelComponent],
 				Baseline:          bl,
 			})
 		}
@@ -895,9 +910,9 @@ func runInteractiveOperator(ctx context.Context, cfg *config.Config, cli sigs.Cl
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				consts.LabelPackageName:    selected.PackageSecretName,
-				consts.LabelPackageVersion: selected.PackageVersion,
-				consts.LabelComponent:      selected.Component,
+				zeusv1.LabelPackageName:    selected.PackageSecretName,
+				zeusv1.LabelPackageVersion: selected.PackageVersion,
+				zeusv1.LabelComponent:      selected.Component,
 				saolaconsts.LabelDefinition:            selected.Name,
 			},
 		},

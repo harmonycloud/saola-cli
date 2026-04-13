@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package operator
 
 import (
@@ -6,11 +22,10 @@ import (
 	"os"
 
 	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
-	zeusk8s "gitee.com/opensaola/opensaola/pkg/k8s"
-	"gitee.com/opensaola/opensaola/pkg/service/consts"
-	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
-	"gitee.com/opensaola/opensaola/pkg/service/packages"
 	"gitee.com/opensaola/saola-cli/internal/client"
+	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
+	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
+	"gitee.com/opensaola/saola-cli/internal/packages"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
@@ -120,9 +135,9 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 		return fmt.Errorf("check existing MiddlewareOperator: %w", getErr)
 	}
 
-	// Auto-enrich labels required by zeus-operator before creating.
+	// Auto-enrich labels required by opensaola before creating.
 	//
-	// 创建前自动补全 zeus-operator reconcile 所需的 labels。
+	// 创建前自动补全 opensaola reconcile 所需的 labels。
 	if err = o.enrichOperator(ctx, cli, mo); err != nil {
 		return err
 	}
@@ -136,13 +151,13 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 }
 
 
-// enrichOperator auto-completes the four labels that zeus-operator requires to
+// enrichOperator auto-completes the four labels that opensaola requires to
 // reconcile a MiddlewareOperator CR successfully.
 //
 // It is a no-op when mo.Spec.Baseline is empty (caller may have set labels manually)
-// or when mo.Labels[consts.LabelPackageName] is already set.
+// or when mo.Labels[zeusv1.LabelPackageName] is already set.
 //
-// enrichOperator 自动补全 zeus-operator reconcile 所需的四个 label；
+// enrichOperator 自动补全 opensaola reconcile 所需的四个 label；
 // 若 spec.baseline 为空或 LabelPackageName 已存在则跳过。
 func (o *CreateOptions) enrichOperator(ctx context.Context, cli sigs.Client, mo *zeusv1.MiddlewareOperator) error {
 	// Defensively set the package namespace first, regardless of early-return
@@ -163,7 +178,7 @@ func (o *CreateOptions) enrichOperator(ctx context.Context, cli sigs.Client, mo 
 	// Skip auto-enrichment when the caller has already supplied the package label.
 	//
 	// 如果调用方已经设置了包名 label，则跳过自动补全。
-	if mo.Labels != nil && mo.Labels[consts.LabelPackageName] != "" {
+	if mo.Labels != nil && mo.Labels[zeusv1.LabelPackageName] != "" {
 		return nil
 	}
 
@@ -171,8 +186,8 @@ func (o *CreateOptions) enrichOperator(ctx context.Context, cli sigs.Client, mo 
 	//
 	// 列出包命名空间中所有已启用的包 Secret。
 	secrets, err := zeusk8s.GetSecrets(ctx, cli, o.Config.PkgNamespace, sigs.MatchingLabels{
-		consts.LabelProject: consts.ProjectZeusOperator,
-		consts.LabelEnabled: "true",
+		zeusv1.LabelProject: saolaconsts.ProjectOpenSaola,
+		zeusv1.LabelEnabled: "true",
 	})
 	if err != nil {
 		return fmt.Errorf("list package secrets: %w", err)
@@ -212,10 +227,10 @@ func (o *CreateOptions) enrichOperator(ctx context.Context, cli sigs.Client, mo 
 	if !matchedFound {
 		// No installed package contains the requested baseline — fail fast so the
 		// user gets a clear error rather than a zombied MiddlewareOperator missing
-		// the four labels that zeus-operator requires to reconcile successfully.
+		// the four labels that opensaola requires to reconcile successfully.
 		//
 		// 未找到包含目标 baseline 的已安装包时报错，避免 MiddlewareOperator 缺少
-		// zeus-operator reconcile 所需的四个 label 而进入僵尸状态。
+		// opensaola reconcile 所需的四个 label 而进入僵尸状态。
 		return fmt.Errorf(
 			"no installed package contains MiddlewareOperatorBaseline %q in namespace %q; "+
 				"install the package first or set the four required labels manually",
@@ -238,12 +253,12 @@ func (o *CreateOptions) enrichOperator(ctx context.Context, cli sigs.Client, mo 
 		mo.Labels = make(map[string]string)
 	}
 
-	// Set the four labels required by the zeus-operator reconciler.
+	// Set the four labels required by the opensaola reconciler.
 	//
-	// 设置 zeus-operator reconciler 所需的四个 label。
-	mo.Labels[consts.LabelPackageName] = matchedSecretName
-	mo.Labels[consts.LabelPackageVersion] = pkgSecret.Labels[consts.LabelPackageVersion]
-	mo.Labels[consts.LabelComponent] = pkgSecret.Labels[consts.LabelComponent]
+	// 设置 opensaola reconciler 所需的四个 label。
+	mo.Labels[zeusv1.LabelPackageName] = matchedSecretName
+	mo.Labels[zeusv1.LabelPackageVersion] = pkgSecret.Labels[zeusv1.LabelPackageVersion]
+	mo.Labels[zeusv1.LabelComponent] = pkgSecret.Labels[zeusv1.LabelComponent]
 	mo.Labels[saolaconsts.LabelDefinition] = mo.Spec.Baseline
 
 	// Print a summary of what was auto-completed so the user can verify.
@@ -256,9 +271,9 @@ func (o *CreateOptions) enrichOperator(ctx context.Context, cli sigs.Client, mo 
 			"  %s=%s\n"+
 			"  %s=%s\n",
 		mo.Name,
-		consts.LabelPackageName, mo.Labels[consts.LabelPackageName],
-		consts.LabelPackageVersion, mo.Labels[consts.LabelPackageVersion],
-		consts.LabelComponent, mo.Labels[consts.LabelComponent],
+		zeusv1.LabelPackageName, mo.Labels[zeusv1.LabelPackageName],
+		zeusv1.LabelPackageVersion, mo.Labels[zeusv1.LabelPackageVersion],
+		zeusv1.LabelComponent, mo.Labels[zeusv1.LabelComponent],
 		saolaconsts.LabelDefinition, mo.Labels[saolaconsts.LabelDefinition],
 	)
 

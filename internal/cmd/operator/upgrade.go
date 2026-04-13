@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package operator
 
 import (
@@ -7,9 +23,8 @@ import (
 	"time"
 
 	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
-	zeusk8s "gitee.com/opensaola/opensaola/pkg/k8s"
-	"gitee.com/opensaola/opensaola/pkg/service/consts"
 	"gitee.com/opensaola/saola-cli/internal/client"
+	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
@@ -124,10 +139,10 @@ func (o *UpgradeOptions) Run(ctx context.Context) error {
 	//
 	// 防止并发升级：若 middleware.cn/update 注解已存在，则拒绝本次操作。
 	if mo.Annotations != nil {
-		if _, ok := mo.Annotations[consts.LabelUpdate]; ok {
+		if _, ok := mo.Annotations[zeusv1.LabelUpdate]; ok {
 			return fmt.Errorf(
 				"middlewareoperator/%s is already upgrading (annotation %s is set); wait for it to complete first",
-				o.Name, consts.LabelUpdate,
+				o.Name, zeusv1.LabelUpdate,
 			)
 		}
 	}
@@ -138,8 +153,8 @@ func (o *UpgradeOptions) Run(ctx context.Context) error {
 	if mo.Annotations == nil {
 		mo.Annotations = make(map[string]string)
 	}
-	mo.Annotations[consts.LabelUpdate] = o.ToVersion
-	mo.Annotations[consts.LabelBaseline] = baseline
+	mo.Annotations[zeusv1.LabelUpdate] = o.ToVersion
+	mo.Annotations[zeusv1.LabelBaseline] = baseline
 
 	if err = cli.Update(ctx, mo); err != nil {
 		return fmt.Errorf("update MiddlewareOperator %s/%s: %w", ns, o.Name, err)
@@ -185,7 +200,7 @@ func waitForUpgrade(ctx context.Context, cli sigs.Client, name, namespace string
 		//
 		// 注解仍存在或状态为 Updating 时，升级尚未完成。
 		if mo.Annotations != nil {
-			if _, ok := mo.Annotations[consts.LabelUpdate]; ok {
+			if _, ok := mo.Annotations[zeusv1.LabelUpdate]; ok {
 				continue
 			}
 		}

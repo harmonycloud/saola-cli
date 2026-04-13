@@ -1,3 +1,19 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package middleware
 
 import (
@@ -7,9 +23,8 @@ import (
 	"time"
 
 	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
-	zeusk8s "gitee.com/opensaola/opensaola/pkg/k8s"
-	"gitee.com/opensaola/opensaola/pkg/service/consts"
 	"gitee.com/opensaola/saola-cli/internal/client"
+	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
@@ -43,7 +58,7 @@ func NewCmdUpgrade(cfg *config.Config) *cobra.Command {
 		Aliases: []string{"mw"},
 		Short:   lang.T("升级 Middleware 实例到指定版本", "Upgrade a Middleware instance to the specified version"),
 		Long: lang.T(
-			`通过在 Middleware CR 上设置 annotation 触发 zeus-operator 执行版本升级。
+			`通过在 Middleware CR 上设置 annotation 触发 OpenSaola 执行版本升级。
 
 controller 检测到 annotation 后将执行 ReplacePackage()：
   查找目标版本包 → 切换 Spec.Baseline → 更新 Labels → 删除 annotation → State: Updating → Available`,
@@ -126,7 +141,7 @@ func (o *UpgradeOptions) Run(ctx context.Context) error {
 	//
 	// 防御检查：若 annotation 已存在，说明上一次升级尚未完成，直接报错。
 	if mw.Annotations != nil {
-		if existing, ok := mw.Annotations[consts.LabelUpdate]; ok {
+		if existing, ok := mw.Annotations[zeusv1.LabelUpdate]; ok {
 			return fmt.Errorf(
 				"upgrade already in progress for middleware %s/%s (pending version: %s); "+
 					"wait for it to complete or remove the annotation manually",
@@ -141,8 +156,8 @@ func (o *UpgradeOptions) Run(ctx context.Context) error {
 	if mw.Annotations == nil {
 		mw.Annotations = map[string]string{}
 	}
-	mw.Annotations[consts.LabelUpdate] = o.ToVersion
-	mw.Annotations[consts.LabelBaseline] = baseline
+	mw.Annotations[zeusv1.LabelUpdate] = o.ToVersion
+	mw.Annotations[zeusv1.LabelBaseline] = baseline
 
 	// 7. Push the update to the API server.
 	//
@@ -199,7 +214,7 @@ func waitForUpgrade(ctx context.Context, cli sigs.Client, name, ns string) error
 				// 临时 API 错误，继续重试直到超时。
 				continue
 			}
-			_, hasUpdate := mw.Annotations[consts.LabelUpdate]
+			_, hasUpdate := mw.Annotations[zeusv1.LabelUpdate]
 			if !hasUpdate && mw.Status.State == zeusv1.StateAvailable {
 				return nil
 			}

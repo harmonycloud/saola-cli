@@ -1,10 +1,26 @@
+/*
+Copyright 2025 The OpenSaola Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package packager
 
 import (
 	"testing"
 
-	"gitee.com/opensaola/opensaola/pkg/service/consts"
-	"gitee.com/opensaola/opensaola/pkg/service/packages"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
 )
 
 // newTestMeta is a helper that returns a minimal Metadata for tests.
@@ -28,11 +44,11 @@ func TestBuildInstallSecret_Labels(t *testing.T) {
 		key      string
 		expected string
 	}{
-		{consts.LabelProject, consts.ProjectZeusOperator},
-		{consts.LabelComponent, meta.Name},
-		{consts.LabelPackageVersion, meta.Version},
-		{consts.LabelPackageName, secretName},
-		{consts.LabelEnabled, "false"},
+		{zeusv1.LabelProject, saolaconsts.ProjectOpenSaola},
+		{zeusv1.LabelComponent, meta.Name},
+		{zeusv1.LabelPackageVersion, meta.Version},
+		{zeusv1.LabelPackageName, secretName},
+		{zeusv1.LabelEnabled, "false"},
 	}
 
 	for _, c := range cases {
@@ -57,26 +73,26 @@ func TestBuildInstallSecret_InstallAnnotation(t *testing.T) {
 	if secret.Annotations == nil {
 		t.Fatal("Annotations is nil, expected install annotation to be set")
 	}
-	if val, ok := secret.Annotations[consts.LabelInstall]; !ok || val != "true" {
+	if val, ok := secret.Annotations[zeusv1.LabelInstall]; !ok || val != "true" {
 		t.Errorf("expected Annotations[%q]=%q, got %q (present=%v)",
-			consts.LabelInstall, "true", val, ok)
+			zeusv1.LabelInstall, "true", val, ok)
 	}
 }
 
-// TestBuildInstallSecret_DataKey verifies that Data uses packages.Release as the key.
+// TestBuildInstallSecret_DataKey verifies that Data uses saolaconsts.Release as the key.
 //
-// TestBuildInstallSecret_DataKey 验证 Data 使用 packages.Release 作为 key。
+// TestBuildInstallSecret_DataKey 验证 Data 使用 saolaconsts.Release 作为 key。
 func TestBuildInstallSecret_DataKey(t *testing.T) {
 	meta := newTestMeta("mysql", "8.0.0")
 	payload := []byte("compressed-tar-content")
 	secret := BuildInstallSecret("mysql-8.0.0", "ops", meta, payload)
 
-	if _, ok := secret.Data[packages.Release]; !ok {
-		t.Errorf("expected Data key %q to exist", packages.Release)
+	if _, ok := secret.Data[saolaconsts.Release]; !ok {
+		t.Errorf("expected Data key %q to exist", saolaconsts.Release)
 	}
-	if string(secret.Data[packages.Release]) != string(payload) {
+	if string(secret.Data[saolaconsts.Release]) != string(payload) {
 		t.Errorf("Data[%q] mismatch: got %q, want %q",
-			packages.Release, secret.Data[packages.Release], payload)
+			saolaconsts.Release, secret.Data[saolaconsts.Release], payload)
 	}
 }
 
@@ -136,8 +152,8 @@ func TestBuildInstallSecret_ExplicitName(t *testing.T) {
 	// LabelPackageName must also match the explicit name.
 	//
 	// LabelPackageName 也应与显式名称一致。
-	if secret.Labels[consts.LabelPackageName] != explicit {
-		t.Errorf("LabelPackageName: got %q, want %q", secret.Labels[consts.LabelPackageName], explicit)
+	if secret.Labels[zeusv1.LabelPackageName] != explicit {
+		t.Errorf("LabelPackageName: got %q, want %q", secret.Labels[zeusv1.LabelPackageName], explicit)
 	}
 }
 
@@ -148,7 +164,7 @@ func TestBuildInstallSecret_EmptyData(t *testing.T) {
 	meta := newTestMeta("zk", "3.9.0")
 	secret := BuildInstallSecret("", "ns", meta, nil)
 
-	if _, ok := secret.Data[packages.Release]; !ok {
-		t.Errorf("expected Data key %q to exist even for nil data", packages.Release)
+	if _, ok := secret.Data[saolaconsts.Release]; !ok {
+		t.Errorf("expected Data key %q to exist even for nil data", saolaconsts.Release)
 	}
 }
