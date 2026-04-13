@@ -4,18 +4,18 @@ go 1.26.1
 
 // TODO: Remove this replace once github.com/opensaola/opensaola is published.
 // Temporarily redirect to gitee mirror.
-replace github.com/opensaola/opensaola => gitee.com/opensaola/opensaola v0.1.0
+replace github.com/opensaola/opensaola => gitee.com/opensaola/opensaola v0.1.1
 
 require (
-	github.com/opensaola/opensaola v0.1.0
 	github.com/charmbracelet/huh v1.0.0
-	github.com/klauspost/compress v1.18.0
+	github.com/klauspost/compress v1.18.5
+	github.com/opensaola/opensaola v0.1.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/spf13/cobra v1.10.0
+	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.35.0
-	k8s.io/apimachinery v0.35.0
-	k8s.io/client-go v0.35.0
+	k8s.io/api v0.35.3
+	k8s.io/apimachinery v0.35.3
+	k8s.io/client-go v0.35.3
 	sigs.k8s.io/controller-runtime v0.23.3
 	sigs.k8s.io/yaml v1.6.0
 )
