@@ -36,22 +36,22 @@ go test ./internal/lang/... -v
 | `internal/cmd/create` | Yes | Resource creation |
 | `internal/cmd/baseline` | Yes | Baseline queries |
 | `internal/cmd/action` | Yes | Action commands |
+| `internal/client` | Yes | Kubernetes client wrapper |
+| `internal/app` | Yes | Root command registration |
+| `internal/consts` | Yes | Constants |
+| `internal/packages` | Yes | Package definitions |
+| `internal/cmd/build` | Yes | Build command |
+| `internal/cmd/delete` | Yes | Delete command |
+| `internal/cmd/describe` | Yes | Describe command |
+| `internal/cmd/get` | Yes | Get command |
+| `internal/cmd/inspect` | Yes | Inspect command |
+| `internal/cmd/install` | Yes | Install command |
+| `internal/cmd/uninstall` | Yes | Uninstall command |
+| `internal/cmd/upgrade` | Yes | Upgrade command |
+| `internal/cmd/resource` | Yes | Resource command |
+| `internal/cmd/run` | Yes | Run command |
+| `internal/cmd/version` | Yes | Version command |
 | `cmd/saola` | No | Main entrypoint |
-| `internal/client` | No | Kubernetes client wrapper (requires cluster) |
-| `internal/app` | No | Root command registration |
-| `internal/consts` | No | Constants only |
-| `internal/packages` | No | Package definitions |
-| `internal/cmd/build` | No | Build command (requires filesystem) |
-| `internal/cmd/delete` | No | Delete command (requires cluster) |
-| `internal/cmd/describe` | No | Describe command (requires cluster) |
-| `internal/cmd/get` | No | Get command (requires cluster) |
-| `internal/cmd/inspect` | No | Inspect command (requires cluster) |
-| `internal/cmd/install` | No | Install command (requires cluster) |
-| `internal/cmd/uninstall` | No | Uninstall command (requires cluster) |
-| `internal/cmd/upgrade` | No | Upgrade command (requires cluster) |
-| `internal/cmd/resource` | No | Resource command |
-| `internal/cmd/run` | No | Run command (requires cluster) |
-| `internal/cmd/version` | No | Version command |
 
 ## 2. Build
 

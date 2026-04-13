@@ -36,21 +36,22 @@ go test ./internal/lang/... -v
 | `internal/cmd/create` | 是 | 资源创建 |
 | `internal/cmd/baseline` | 是 | Baseline 查询 |
 | `internal/cmd/action` | 是 | Action 命令 |
-| `internal/client` | 否 | Kubernetes client 封装（需要集群） |
-| `internal/app` | 否 | 根命令注册 |
-| `internal/consts` | 否 | 仅常量定义 |
-| `internal/packages` | 否 | 包定义 |
-| `internal/cmd/build` | 否 | 构建命令（需要文件系统） |
-| `internal/cmd/delete` | 否 | 删除命令（需要集群） |
-| `internal/cmd/describe` | 否 | 详情命令（需要集群） |
-| `internal/cmd/get` | 否 | 列表命令（需要集群） |
-| `internal/cmd/inspect` | 否 | 检查命令（需要集群） |
-| `internal/cmd/install` | 否 | 安装命令（需要集群） |
-| `internal/cmd/uninstall` | 否 | 卸载命令（需要集群） |
-| `internal/cmd/upgrade` | 否 | 升级命令（需要集群） |
-| `internal/cmd/resource` | 否 | 资源命令 |
-| `internal/cmd/run` | 否 | 运行命令（需要集群） |
-| `internal/cmd/version` | 否 | 版本命令 |
+| `internal/client` | 是 | Kubernetes client 封装 |
+| `internal/app` | 是 | 根命令注册 |
+| `internal/consts` | 是 | 常量定义 |
+| `internal/packages` | 是 | 包定义 |
+| `internal/cmd/build` | 是 | 构建命令 |
+| `internal/cmd/delete` | 是 | 删除命令 |
+| `internal/cmd/describe` | 是 | 详情命令 |
+| `internal/cmd/get` | 是 | 列表命令 |
+| `internal/cmd/inspect` | 是 | 检查命令 |
+| `internal/cmd/install` | 是 | 安装命令 |
+| `internal/cmd/uninstall` | 是 | 卸载命令 |
+| `internal/cmd/upgrade` | 是 | 升级命令 |
+| `internal/cmd/resource` | 是 | 资源命令 |
+| `internal/cmd/run` | 是 | 运行命令 |
+| `internal/cmd/version` | 是 | 版本命令 |
+| `cmd/saola` | 否 | 主入口 |
 
 ## 2. 构建
 
