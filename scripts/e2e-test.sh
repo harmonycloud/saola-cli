@@ -181,8 +181,8 @@ if [ -f "$SAMPLES/clickhouse-middleware.yaml" ]; then
   CH_RUNNING=$(kubectl get pods -n "$NS" -l clickhouse.altinity.com/chi=my-clickhouse --no-headers 2>/dev/null | grep -c Running || echo 0)
   CH_TOTAL=$(kubectl get pods -n "$NS" -l clickhouse.altinity.com/chi=my-clickhouse --no-headers 2>/dev/null | wc -l | tr -d ' ')
   echo "ClickHouse pods: $CH_RUNNING/$CH_TOTAL Running"
-  if [ "$CH_RUNNING" -lt 1 ]; then
-    echo "FAIL: No ClickHouse pods running"
+  if [ "$CH_RUNNING" -lt 2 ]; then
+    echo "FAIL: Expected at least 2 ClickHouse pods running, got $CH_RUNNING"
     kubectl get pods -n "$NS" 2>/dev/null || true
     exit 1
   fi
@@ -199,12 +199,22 @@ fi
 if [ -f "$SAMPLES/clickhouse-middleware.yaml" ]; then
   echo ""
   echo "=== Phase C.5: Middleware Upgrade Test ==="
+
+  # Get current package version for the annotation
+  PKG_VERSION=$(kubectl get mid my-clickhouse -n "$NS" -o jsonpath='{.metadata.labels.middleware\.cn/packageversion}' 2>/dev/null)
+  if [ -z "$PKG_VERSION" ]; then
+    PKG_VERSION=$(echo "$PKG_NAME" | sed 's/.*-\([0-9].*\)/\1/')
+  fi
+  echo "Current package version: $PKG_VERSION"
+
   echo "--- C5.1: Annotate to trigger upgrade ---"
-  kubectl annotate mid my-clickhouse -n "$NS" middleware.cn/update=true --overwrite 2>/dev/null || true
+  kubectl annotate mid my-clickhouse -n "$NS" "middleware.cn/update=$PKG_VERSION" --overwrite
+
   echo "--- C5.2: Verify state transitions ---"
   sleep 5
   STATE=$(kubectl get mid my-clickhouse -n "$NS" -o jsonpath='{.status.state}' 2>/dev/null)
   echo "State after annotation: $STATE"
+
   echo "--- C5.3: Wait for Available again (max 3min) ---"
   for i in $(seq 1 36); do
     STATE=$(kubectl get mid my-clickhouse -n "$NS" -o jsonpath='{.status.state}' 2>/dev/null)
@@ -233,10 +243,10 @@ echo "=== Phase D: Output Formats ==="
 echo ""
 echo "=== Phase D.5: Error Scenarios ==="
 echo "--- D5.1: Duplicate package install ---"
-if "$SAOLA" install "$PKG_DIR" --pkg-namespace "$PKG_NS" 2>&1 | grep -qi 'already exists\|error'; then
-  echo "PASS: Duplicate install correctly rejected"
+if ! "$SAOLA" install "$PKG_DIR" --pkg-namespace "$PKG_NS" 2>&1; then
+  echo "PASS: Duplicate install correctly rejected (non-zero exit)"
 else
-  echo "WARNING: Duplicate install did not return expected error"
+  echo "FAIL: Duplicate install should have returned non-zero exit code"
 fi
 
 echo "--- D5.2: Get non-existent resource ---"
