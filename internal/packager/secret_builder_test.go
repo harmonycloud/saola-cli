@@ -19,7 +19,7 @@ package packager
 import (
 	"testing"
 
-	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	zeusv1 "github.com/OpenSaola/opensaola/api/v1"
 	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
 )
 

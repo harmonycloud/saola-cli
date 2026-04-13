@@ -27,7 +27,7 @@ import (
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
-	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	zeusv1 "github.com/OpenSaola/opensaola/api/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"

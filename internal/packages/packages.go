@@ -30,7 +30,7 @@ import (
 	"io"
 	"time"
 
-	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	zeusv1 "github.com/OpenSaola/opensaola/api/v1"
 	"gitee.com/opensaola/saola-cli/internal/tarutil"
 	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
 	k8shelper "gitee.com/opensaola/saola-cli/internal/k8s"
