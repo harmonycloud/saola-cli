@@ -22,10 +22,12 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
-	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
 	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/cmdutil"
 	"gitee.com/opensaola/saola-cli/internal/config"
+	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -80,6 +82,10 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 	if ns == "" {
 		ns = o.Config.Namespace
 	}
+	// Middleware resources default to the "default" namespace when no namespace is specified,
+	// matching kubectl behavior for namespaced resources.
+	//
+	// Middleware 资源在未指定 namespace 时默认使用 "default"，与 kubectl 对 namespaced 资源的行为一致。
 	if ns == "" {
 		ns = "default"
 	}
@@ -106,7 +112,7 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 	// --- 基础元信息 ---
 	fmt.Fprintf(w, "Name:\t%s\n", mw.Name)
 	fmt.Fprintf(w, "Namespace:\t%s\n", mw.Namespace)
-	fmt.Fprintf(w, "Age:\t%s\n", formatAge(mw.CreationTimestamp.Time))
+	fmt.Fprintf(w, "Age:\t%s\n", cmdutil.FormatAge(time.Since(mw.CreationTimestamp.Time)))
 	if len(mw.Labels) > 0 {
 		fmt.Fprintf(w, "Labels:\t%s\n", formatLabels(mw.Labels))
 	}
@@ -175,7 +181,7 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 				c.Type,
 				conditionStatus(c),
 				c.Reason,
-				truncate(c.Message, 60),
+				cmdutil.Truncate(c.Message, 60),
 			)
 		}
 	}
@@ -207,17 +213,8 @@ func formatLabels(labels map[string]string) string {
 func formatAnnotations(annotations map[string]string) string {
 	parts := make([]string, 0, len(annotations))
 	for k, v := range annotations {
-		parts = append(parts, k+"="+truncate(v, 40))
+		parts = append(parts, k+"="+cmdutil.Truncate(v, 40))
 	}
 	return strings.Join(parts, ",")
 }
 
-// truncate shortens s to maxLen characters, appending "..." if needed.
-//
-// 将字符串截断到 maxLen 个字符，超出时追加 "..."。
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
-}

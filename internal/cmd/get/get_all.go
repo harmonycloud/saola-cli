@@ -53,6 +53,7 @@ A section header is printed before each resource type, even when the list is emp
   saola get all -o yaml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
+			var errs []error
 
 			// --- Middlewares ---
 			//
@@ -66,6 +67,7 @@ A section header is printed before each resource type, even when the list is emp
 			}
 			if err := mwOpts.Run(ctx); err != nil {
 				fmt.Fprintf(os.Stderr, "error listing middlewares: %v\n", err)
+				errs = append(errs, err)
 			}
 
 			fmt.Fprintln(os.Stdout, "")
@@ -82,6 +84,7 @@ A section header is printed before each resource type, even when the list is emp
 			}
 			if err := opOpts.Run(ctx); err != nil {
 				fmt.Fprintf(os.Stderr, "error listing operators: %v\n", err)
+				errs = append(errs, err)
 			}
 
 			fmt.Fprintln(os.Stdout, "")
@@ -98,8 +101,12 @@ A section header is printed before each resource type, even when the list is emp
 			}
 			if err := actOpts.Run(ctx); err != nil {
 				fmt.Fprintf(os.Stderr, "error listing actions: %v\n", err)
+				errs = append(errs, err)
 			}
 
+			if len(errs) > 0 {
+				return fmt.Errorf("encountered %d error(s) listing resources", len(errs))
+			}
 			return nil
 		},
 	}

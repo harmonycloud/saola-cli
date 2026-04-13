@@ -24,12 +24,13 @@ import (
 	"strings"
 	"time"
 
-	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
-	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/cmdutil"
 	"gitee.com/opensaola/saola-cli/internal/config"
+	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"gitee.com/opensaola/saola-cli/internal/printer"
+	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -115,6 +116,10 @@ func (o *GetOptions) Run(ctx context.Context) error {
 	// Single-object get.
 	//
 	// 获取单个对象。
+	// Middleware resources default to the "default" namespace when no namespace is specified,
+	// matching kubectl behavior for namespaced resources.
+	//
+	// Middleware 资源在未指定 namespace 时默认使用 "default"，与 kubectl 对 namespaced 资源的行为一致。
 	if o.Name != "" {
 		ns := o.Namespace
 		if ns == "" {
@@ -199,7 +204,7 @@ func printMiddlewares(p printer.Printer, items []zeusv1.Middleware, format strin
 				NAMESPACE: mw.Namespace,
 				BASELINE:  mw.Spec.Baseline,
 				STATE:     string(mw.Status.State),
-				AGE:       formatAge(mw.CreationTimestamp.Time),
+				AGE:       cmdutil.FormatAge(time.Since(mw.CreationTimestamp.Time)),
 				LABELS:    formatLabelsShort(mw.Labels),
 			})
 		}
@@ -216,7 +221,7 @@ func printMiddlewares(p printer.Printer, items []zeusv1.Middleware, format strin
 			NAMESPACE: mw.Namespace,
 			BASELINE:  mw.Spec.Baseline,
 			STATE:     string(mw.Status.State),
-			AGE:       formatAge(mw.CreationTimestamp.Time),
+			AGE:       cmdutil.FormatAge(time.Since(mw.CreationTimestamp.Time)),
 		})
 	}
 	return p.Print(os.Stdout, rows)
@@ -243,25 +248,3 @@ func formatLabelsShort(labels map[string]string) string {
 	return strings.Join(parts, ",")
 }
 
-// formatAge returns a human-readable duration string since t.
-//
-// 返回从 t 到现在的可读时长字符串。
-func formatAge(t time.Time) string {
-	if t.IsZero() {
-		return "<unknown>"
-	}
-	d := time.Since(t).Round(time.Second)
-	if d < 0 {
-		return "<just now>"
-	}
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	}
-	if d < 24*time.Hour {
-		return fmt.Sprintf("%dh", int(d.Hours()))
-	}
-	return fmt.Sprintf("%dd", int(d.Hours()/24))
-}

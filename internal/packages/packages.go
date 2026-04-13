@@ -247,16 +247,18 @@ func GetMiddlewareOperatorBaseline(ctx context.Context, cli client.Client, name,
 	}
 
 	for _, v := range pkg.Files {
-		if bytes.Contains(v, []byte("kind: MiddlewareOperatorBaseline")) &&
-			bytes.Contains(v, []byte(fmt.Sprintf("name: %s", name))) {
-			b := new(zeusv1.MiddlewareOperatorBaseline)
-			if uErr := yaml.Unmarshal(v, b); uErr != nil {
-				return nil, uErr
-			}
+		if !bytes.Contains(v, []byte("kind: MiddlewareOperatorBaseline")) {
+			continue
+		}
+		b := new(zeusv1.MiddlewareOperatorBaseline)
+		if uErr := yaml.Unmarshal(v, b); uErr != nil {
+			continue
+		}
+		if b.Name == name {
 			return b, nil
 		}
 	}
-	return nil, apiErrors.NewNotFound(schema.GroupResource{Group: "middleware.cn", Resource: "MiddlewareOperatorBaseline"}, name)
+	return nil, fmt.Errorf("MiddlewareOperatorBaseline %q not found in package %q", name, packageName)
 }
 
 // GetMiddlewareActionBaselines returns all MiddlewareActionBaseline definitions from a package.

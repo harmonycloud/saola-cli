@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"text/tabwriter"
 )
@@ -73,6 +74,7 @@ func printMapTable(w io.Writer, rows []map[string]string) error {
 	for k := range rows[0] {
 		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 	// Print header.
 	_, err := fmt.Fprintln(w, strings.Join(keys, "\t"))
 	if err != nil {

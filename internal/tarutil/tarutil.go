@@ -27,8 +27,21 @@ import (
 	"archive/tar"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
+)
+
+const (
+	// maxFileSize is the maximum allowed size of a single file in the TAR archive (100MB).
+	//
+	// maxFileSize 是 TAR 归档中单个文件允许的最大大小（100MB）。
+	maxFileSize = 100 * 1024 * 1024
+
+	// maxFileCount is the maximum number of files allowed in a TAR archive.
+	//
+	// maxFileCount 是 TAR 归档中允许的最大文件数量。
+	maxFileCount = 10000
 )
 
 // TarInfo holds the parsed contents of a TAR archive.
@@ -61,6 +74,7 @@ func (t *TarInfo) ReadFile(name string) ([]byte, error) {
 func ReadTarInfo(data []byte) (*TarInfo, error) {
 	info := &TarInfo{Files: make(map[string][]byte)}
 	tr := tar.NewReader(bytes.NewBuffer(data))
+	fileCount := 0
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -70,8 +84,22 @@ func ReadTarInfo(data []byte) (*TarInfo, error) {
 		}
 
 		if hdr.Typeflag == tar.TypeReg {
+			if hdr.Size > maxFileSize {
+				return nil, fmt.Errorf("file %q exceeds maximum allowed size (%d > %d)", hdr.Name, hdr.Size, maxFileSize)
+			}
+
+			fileCount++
+			if fileCount > maxFileCount {
+				return nil, fmt.Errorf("archive exceeds maximum file count (%d)", maxFileCount)
+			}
+
 			dirs := strings.Split(hdr.Name, "/")
-			name := strings.Join(dirs[1:], "/")
+			var name string
+			if len(dirs) < 2 {
+				name = hdr.Name
+			} else {
+				name = strings.Join(dirs[1:], "/")
+			}
 
 			info.Files[name], err = io.ReadAll(tr)
 			if err != nil {

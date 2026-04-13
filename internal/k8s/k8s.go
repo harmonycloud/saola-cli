@@ -54,6 +54,9 @@ func CreateMiddleware(ctx context.Context, cli client.Client, m *zeusv1.Middlewa
 	if err == nil {
 		return errors.NewAlreadyExists(MiddlewareGroupResource(), m.Name)
 	}
+	if !errors.IsNotFound(err) {
+		return fmt.Errorf("check middleware existence: %w", err)
+	}
 	return cli.Create(ctx, m)
 }
 
@@ -91,6 +94,27 @@ func DeleteMiddleware(ctx context.Context, cli client.Client, m *zeusv1.Middlewa
 // MiddlewareOperator helpers
 // MiddlewareOperator 辅助函数
 // ---------------------------------------------------------------------------
+
+// MiddlewareOperatorGroupResource returns the GroupResource for MiddlewareOperator.
+//
+// 返回 MiddlewareOperator 的 GroupResource。
+func MiddlewareOperatorGroupResource() schema.GroupResource {
+	return schema.GroupResource{Group: "middleware.cn", Resource: "MiddlewareOperator"}
+}
+
+// CreateMiddlewareOperator creates a MiddlewareOperator CR, returning AlreadyExists if it exists.
+//
+// 创建 MiddlewareOperator CR，若已存在则返回 AlreadyExists 错误。
+func CreateMiddlewareOperator(ctx context.Context, cli client.Client, m *zeusv1.MiddlewareOperator) error {
+	_, err := GetMiddlewareOperator(ctx, cli, m.Name, m.Namespace)
+	if err == nil {
+		return errors.NewAlreadyExists(MiddlewareOperatorGroupResource(), m.Name)
+	}
+	if !errors.IsNotFound(err) {
+		return fmt.Errorf("check middleware operator existence: %w", err)
+	}
+	return cli.Create(ctx, m)
+}
 
 // GetMiddlewareOperator retrieves a single MiddlewareOperator by name and namespace.
 //

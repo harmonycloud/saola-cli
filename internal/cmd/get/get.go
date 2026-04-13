@@ -57,6 +57,24 @@ Supported resource types:
   package     (alias: pkg)  — Installed middleware packages
   all                       — Aggregate output of middleware, operator and action`,
 		),
+		Example: lang.T(
+			`  # 列出当前命名空间的 Middleware
+  saola get middleware -n my-ns
+
+  # 列出所有命名空间的 Operator
+  saola get operator -A
+
+  # 查看所有资源（middleware + operator + action）
+  saola get all -n my-ns`,
+			`  # List middlewares in a namespace
+  saola get middleware -n my-ns
+
+  # List operators across all namespaces
+  saola get operator -A
+
+  # View all resources (middleware + operator + action)
+  saola get all -n my-ns`,
+		),
 	}
 
 	cmd.AddCommand(

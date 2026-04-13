@@ -23,13 +23,13 @@ import (
 	"text/tabwriter"
 	"time"
 
-	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/cmdutil"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"gitee.com/opensaola/saola-cli/internal/printer"
+	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"github.com/spf13/cobra"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -118,8 +118,7 @@ func (o *GetOptions) Run(ctx context.Context) error {
 			return fmt.Errorf("get MiddlewareAction: %w", err)
 		}
 		if o.Output == "table" || o.Output == "" {
-			printActionTable([]*zeusv1.MiddlewareAction{action}, o.AllNamespaces)
-			return nil
+			return printActionTable([]*zeusv1.MiddlewareAction{action}, o.AllNamespaces)
 		}
 		return p.Print(os.Stdout, action)
 	}
@@ -146,15 +145,14 @@ func (o *GetOptions) Run(ctx context.Context) error {
 		for i := range list.Items {
 			items = append(items, &list.Items[i])
 		}
-		printActionTable(items, o.AllNamespaces)
-		return nil
+		return printActionTable(items, o.AllNamespaces)
 	}
 	return p.Print(os.Stdout, list.Items)
 }
 
 // printActionTable renders a table with columns: NAME NAMESPACE MIDDLEWARE BASELINE STATE AGE.
 // printActionTable 以表格形式输出 NAME NAMESPACE MIDDLEWARE BASELINE STATE AGE 列。
-func printActionTable(actions []*zeusv1.MiddlewareAction, showNamespace bool) {
+func printActionTable(actions []*zeusv1.MiddlewareAction, showNamespace bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 	if showNamespace {
 		fmt.Fprintln(w, "NAME\tNAMESPACE\tMIDDLEWARE\tBASELINE\tSTATE\tAGE")
@@ -162,7 +160,7 @@ func printActionTable(actions []*zeusv1.MiddlewareAction, showNamespace bool) {
 		fmt.Fprintln(w, "NAME\tMIDDLEWARE\tBASELINE\tSTATE\tAGE")
 	}
 	for _, a := range actions {
-		age := formatAge(a.CreationTimestamp)
+		age := cmdutil.FormatAge(time.Since(a.CreationTimestamp.Time))
 		state := string(a.Status.State)
 		if state == "" {
 			state = "<unknown>"
@@ -175,24 +173,9 @@ func printActionTable(actions []*zeusv1.MiddlewareAction, showNamespace bool) {
 				a.Name, a.Spec.MiddlewareName, a.Spec.Baseline, state, age)
 		}
 	}
-	_ = w.Flush()
+	if err := w.Flush(); err != nil {
+		return fmt.Errorf("flush output: %w", err)
+	}
+	return nil
 }
 
-// formatAge returns a human-readable age string from a creation timestamp.
-// formatAge 将创建时间戳格式化为人类可读的时间差字符串。
-func formatAge(t metav1.Time) string {
-	if t.IsZero() {
-		return "<unknown>"
-	}
-	d := time.Since(t.Time).Round(time.Second)
-	switch {
-	case d < time.Minute:
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	case d < time.Hour:
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd", int(d.Hours()/24))
-	}
-}

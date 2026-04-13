@@ -24,11 +24,12 @@ import (
 	"strings"
 	"time"
 
-	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/cmdutil"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
 	"gitee.com/opensaola/saola-cli/internal/printer"
+	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -127,6 +128,10 @@ func (o *GetOptions) getSingle(ctx context.Context, cli sigs.Client, p printer.P
 	if ns == "" {
 		ns = o.Config.Namespace
 	}
+	// MiddlewareOperator requires an explicit namespace to prevent accidental operations
+	// across namespaces, as operators manage cluster-wide middleware types.
+	//
+	// MiddlewareOperator 要求显式指定 namespace，以防止跨 namespace 的误操作，因为 operator 管理的是集群级别的中间件类型。
 	if ns == "" {
 		return fmt.Errorf("namespace is required: specify --namespace or set SAOLA_NAMESPACE")
 	}
@@ -237,7 +242,7 @@ func toRow(mo *zeusv1.MiddlewareOperator) []string {
 	}
 	age := "-"
 	if !mo.CreationTimestamp.IsZero() {
-		age = formatAge(time.Since(mo.CreationTimestamp.Time))
+		age = cmdutil.FormatAge(time.Since(mo.CreationTimestamp.Time))
 	}
 	return []string{
 		mo.Name,
@@ -278,18 +283,3 @@ func formatLabelsShort(labels map[string]string) string {
 	return strings.Join(parts, ",")
 }
 
-// formatAge formats a duration into a human-readable age string.
-//
-// formatAge 将 duration 格式化为人类可读的 age 字符串。
-func formatAge(d time.Duration) string {
-	switch {
-	case d < time.Minute:
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	case d < time.Hour:
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd", int(d.Hours()/24))
-	}
-}

@@ -108,6 +108,10 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 	if ns != "" {
 		mw.Namespace = ns
 	}
+	// Middleware resources default to the "default" namespace when no namespace is specified,
+	// matching kubectl behavior for namespaced resources.
+	//
+	// Middleware 资源在未指定 namespace 时默认使用 "default"，与 kubectl 对 namespaced 资源的行为一致。
 	if mw.Namespace == "" {
 		mw.Namespace = "default"
 	}

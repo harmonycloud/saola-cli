@@ -107,6 +107,10 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 		mo.Namespace = o.Config.Namespace
 	}
 
+	// MiddlewareOperator requires an explicit namespace to prevent accidental operations
+	// across namespaces, as operators manage cluster-wide middleware types.
+	//
+	// MiddlewareOperator 要求显式指定 namespace，以防止跨 namespace 的误操作，因为 operator 管理的是集群级别的中间件类型。
 	if mo.Namespace == "" {
 		return fmt.Errorf("namespace is required: specify --namespace or set it in the manifest")
 	}

@@ -23,12 +23,13 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	zeusv1 "github.com/opensaola/opensaola/api/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/cmdutil"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
+	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"github.com/spf13/cobra"
+	appsv1 "k8s.io/api/apps/v1"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -78,6 +79,10 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 	if ns == "" {
 		ns = o.Config.Namespace
 	}
+	// MiddlewareOperator requires an explicit namespace to prevent accidental operations
+	// across namespaces, as operators manage cluster-wide middleware types.
+	//
+	// MiddlewareOperator 要求显式指定 namespace，以防止跨 namespace 的误操作，因为 operator 管理的是集群级别的中间件类型。
 	if ns == "" {
 		return fmt.Errorf("namespace is required: specify --namespace or set SAOLA_NAMESPACE")
 	}
@@ -164,7 +169,7 @@ func printDescribe(w *os.File, mo *zeusv1.MiddlewareOperator) {
 				c.Type,
 				string(c.Status),
 				c.Reason,
-				truncate(c.Message, 60),
+				cmdutil.Truncate(c.Message, 60),
 			)
 		}
 	}
@@ -218,13 +223,4 @@ func formatLabels(m map[string]string) string {
 	return strings.Join(parts, ", ")
 }
 
-// truncate clips s to max characters, appending "..." if clipped.
-//
-// truncate 截断字符串到最大长度，超出时追加 "..."。
-func truncate(s string, max int) string {
-	if len(s) <= max {
-		return s
-	}
-	return s[:max-3] + "..."
-}
 
