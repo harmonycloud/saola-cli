@@ -19,23 +19,33 @@ type Format string
 
 const (
 	FormatTable Format = "table"
+	FormatWide  Format = "wide"
 	FormatYAML  Format = "yaml"
 	FormatJSON  Format = "json"
+	FormatName  Format = "name"
 )
 
 // New returns a Printer for the given format string.
-// Defaults to table if format is empty or unrecognised.
+// "wide" is treated as an alias for "table"; the wider column set is
+// determined by the caller passing a different row struct.
+// "name" returns a NamePrinter with an empty ResourceType; callers that
+// need a "type/name" prefix should set ResourceType after construction.
 //
-// 根据格式字符串返回对应的 Printer；格式为空或无法识别时默认返回 table 格式。
+// 根据格式字符串返回对应的 Printer。
+// "wide" 是 "table" 的别名，更宽的列集合由调用方传入不同的行结构体决定。
+// "name" 返回 ResourceType 为空的 NamePrinter；需要 "type/name" 前缀的调用方
+// 应在构造后自行设置 ResourceType。
 func New(format string) (Printer, error) {
 	switch Format(format) {
-	case FormatTable, "":
+	case FormatTable, FormatWide, "":
 		return &TablePrinter{}, nil
 	case FormatYAML:
 		return &YAMLPrinter{}, nil
 	case FormatJSON:
 		return &JSONPrinter{}, nil
+	case FormatName:
+		return &NamePrinter{}, nil
 	default:
-		return nil, fmt.Errorf("unknown output format %q (supported: table, yaml, json)", format)
+		return nil, fmt.Errorf("unknown output format %q (supported: table, wide, yaml, json, name)", format)
 	}
 }

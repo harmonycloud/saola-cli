@@ -7,11 +7,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	"gitea.com/middleware-management/saola-cli/internal/client"
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
+	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )

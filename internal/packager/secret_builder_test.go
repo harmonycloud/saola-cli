@@ -3,8 +3,8 @@ package packager
 import (
 	"testing"
 
-	"gitea.com/middleware-management/zeus-operator/pkg/service/consts"
-	"gitea.com/middleware-management/zeus-operator/pkg/service/packages"
+	"gitee.com/opensaola/opensaola/pkg/service/consts"
+	"gitee.com/opensaola/opensaola/pkg/service/packages"
 )
 
 // newTestMeta is a helper that returns a minimal Metadata for tests.

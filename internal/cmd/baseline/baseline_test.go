@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/config"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	"gitee.com/opensaola/saola-cli/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"

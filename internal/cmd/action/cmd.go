@@ -1,8 +1,8 @@
 package action
 
 import (
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
+	"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 )
 

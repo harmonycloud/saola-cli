@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitea.com/middleware-management/saola-cli/internal/app"
+	"gitee.com/opensaola/saola-cli/internal/app"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

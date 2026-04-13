@@ -4,14 +4,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
-	zeusk8s "gitea.com/middleware-management/zeus-operator/pkg/k8s"
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/client"
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
-	"gitea.com/middleware-management/saola-cli/internal/printer"
+	zeusk8s "gitee.com/opensaola/opensaola/pkg/k8s"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
+	"gitee.com/opensaola/saola-cli/internal/printer"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -70,7 +72,7 @@ Use -A / --all-namespaces to list across all namespaces.`,
 	}
 
 	cmd.Flags().StringVarP(&o.Namespace, "namespace", "n", "", lang.T("目标命名空间", "Target namespace"))
-	cmd.Flags().StringVarP(&o.Output, "output", "o", "table", lang.T("输出格式：table|yaml|json", "Output format: table|yaml|json"))
+	cmd.Flags().StringVarP(&o.Output, "output", "o", "table", lang.T("输出格式：table|wide|yaml|json|name", "Output format: table|wide|yaml|json|name"))
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", false, lang.T("跨所有命名空间列出", "List across all namespaces"))
 
 	return cmd
@@ -136,20 +138,61 @@ func (o *GetOptions) Run(ctx context.Context) error {
 	return printMiddlewares(p, items, o.Output)
 }
 
+// middlewareWideRow is the table row model for wide output (extra LABELS column).
+//
+// middlewareWideRow 是 wide 模式下的行结构，额外包含 LABELS 列。
+type middlewareWideRow struct {
+	NAME      string
+	NAMESPACE string
+	BASELINE  string
+	STATE     string
+	AGE       string
+	LABELS    string
+}
+
 // printMiddlewares prints a slice of Middleware objects using the given printer.
 //
-// 用指定的 printer 输出 Middleware 列表。
+// 用指定的 printer 输出 Middleware 列表，支持 table/wide/yaml/json/name 格式。
 func printMiddlewares(p printer.Printer, items []zeusv1.Middleware, format string) error {
-	// For non-table formats, marshal the full objects.
+	// For structured formats, marshal the full objects.
 	//
-	// 非 table 格式直接输出完整对象。
+	// 结构化格式直接输出完整对象。
 	if format == "yaml" || format == "json" {
 		return p.Print(os.Stdout, items)
 	}
 
-	// Build table rows.
+	// name format: output "middleware/name" per line.
 	//
-	// 构建 table 行。
+	// name 格式：每行输出 "middleware/name"。
+	if format == "name" {
+		np, ok := p.(*printer.NamePrinter)
+		if ok {
+			np.ResourceType = "middleware"
+		}
+		return p.Print(os.Stdout, items)
+	}
+
+	// wide format: include LABELS column.
+	//
+	// wide 格式：额外显示 LABELS 列。
+	if format == "wide" {
+		rows := make([]middlewareWideRow, 0, len(items))
+		for _, mw := range items {
+			rows = append(rows, middlewareWideRow{
+				NAME:      mw.Name,
+				NAMESPACE: mw.Namespace,
+				BASELINE:  mw.Spec.Baseline,
+				STATE:     string(mw.Status.State),
+				AGE:       formatAge(mw.CreationTimestamp.Time),
+				LABELS:    formatLabelsShort(mw.Labels),
+			})
+		}
+		return p.Print(os.Stdout, rows)
+	}
+
+	// Default: standard table rows.
+	//
+	// 默认：标准 table 行。
 	rows := make([]middlewareRow, 0, len(items))
 	for _, mw := range items {
 		rows = append(rows, middlewareRow{
@@ -161,6 +204,27 @@ func printMiddlewares(p printer.Printer, items []zeusv1.Middleware, format strin
 		})
 	}
 	return p.Print(os.Stdout, rows)
+}
+
+// formatLabelsShort converts a label map to a compact "k=v,k=v" string.
+// Keys are sorted for deterministic output. Returns "<none>" if the map is empty.
+//
+// 将 label map 转换为紧凑的 "k=v,k=v" 字符串。
+// key 排序以确保输出确定性；map 为空时返回 "<none>"。
+func formatLabelsShort(labels map[string]string) string {
+	if len(labels) == 0 {
+		return "<none>"
+	}
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, k+"="+labels[k])
+	}
+	return strings.Join(parts, ",")
 }
 
 // formatAge returns a human-readable duration string since t.

@@ -1,14 +1,23 @@
 package app
 
 import (
-	"gitea.com/middleware-management/saola-cli/internal/cmd/action"
-	"gitea.com/middleware-management/saola-cli/internal/cmd/baseline"
-	"gitea.com/middleware-management/saola-cli/internal/cmd/middleware"
-	"gitea.com/middleware-management/saola-cli/internal/cmd/operator"
-	"gitea.com/middleware-management/saola-cli/internal/cmd/pkgcmd"
-	versioncmd "gitea.com/middleware-management/saola-cli/internal/cmd/version"
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
+	// New kubectl-style verb commands.
+	//
+	// 新的 kubectl 风格动词命令。
+	buildcmd "gitee.com/opensaola/saola-cli/internal/cmd/build"
+	createcmd "gitee.com/opensaola/saola-cli/internal/cmd/create"
+	deletecmd "gitee.com/opensaola/saola-cli/internal/cmd/delete"
+	describecmd "gitee.com/opensaola/saola-cli/internal/cmd/describe"
+	getcmd "gitee.com/opensaola/saola-cli/internal/cmd/get"
+	inspectcmd "gitee.com/opensaola/saola-cli/internal/cmd/inspect"
+	installcmd "gitee.com/opensaola/saola-cli/internal/cmd/install"
+	runcmd "gitee.com/opensaola/saola-cli/internal/cmd/run"
+	uninstallcmd "gitee.com/opensaola/saola-cli/internal/cmd/uninstall"
+	upgradecmd "gitee.com/opensaola/saola-cli/internal/cmd/upgrade"
+	versioncmd "gitee.com/opensaola/saola-cli/internal/cmd/version"
+
+"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 )
 
@@ -43,15 +52,23 @@ func NewRootCmd() *cobra.Command {
 	pf.String("log-level", "info", lang.T("日志详细级别：debug|info|warn|error", "Log verbosity: debug|info|warn|error"))
 	pf.Bool("no-color", false, lang.T("禁用彩色输出", "Disable colored output"))
 
-	// --- Sub-command groups ---
+	// --- New kubectl-style verb commands ---
+	//
+	// 新的 kubectl 风格动词命令。
 	root.AddCommand(
-		pkgcmd.NewCmdPackage(cfg),
-		middleware.NewCmdMiddleware(cfg),
-		operator.NewCmdOperator(cfg),
-		action.NewCmdAction(cfg),
-		baseline.NewCmdBaseline(cfg),
+		getcmd.NewCmdGet(cfg),
+		createcmd.NewCmdCreate(cfg),
+		deletecmd.NewCmdDelete(cfg),
+		describecmd.NewCmdDescribe(cfg),
+		runcmd.NewCmdRun(cfg),
+		installcmd.NewCmdInstall(cfg),
+		uninstallcmd.NewCmdUninstall(cfg),
+		upgradecmd.NewCmdUpgrade(cfg),
+		buildcmd.NewCmdBuild(cfg),
+		inspectcmd.NewCmdInspect(cfg),
 		versioncmd.NewCmdVersion(cfg),
 	)
+
 
 	// Patch cobra's auto-generated English-only text to be bilingual.
 	//

@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitea.com/middleware-management/zeus-operator/pkg/service/packages"
+	"gitee.com/opensaola/opensaola/pkg/service/packages"
 	"gopkg.in/yaml.v3"
 )
 

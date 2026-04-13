@@ -1,4 +1,21 @@
+# Binaries
 bin/
-vendor/
-.idea/
+saola
 *.exe
+
+# Dependencies
+vendor/
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+
+# Sensitive
+kubeconfig/
+
+# Build artifacts
+*.pkg
+*.log
+.env*

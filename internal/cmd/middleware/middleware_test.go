@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/config"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	"gitee.com/opensaola/saola-cli/internal/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,6 +73,8 @@ kind: Middleware
 metadata:
   name: my-redis
   namespace: staging
+  labels:
+    middleware.cn/packagename: redis-1.0.0
 spec:
   baseline: redis-7
 `
@@ -143,6 +145,8 @@ kind: Middleware
 metadata:
   name: my-redis
   namespace: original-ns
+  labels:
+    middleware.cn/packagename: redis-1.0.0
 spec:
   baseline: redis-7
 `

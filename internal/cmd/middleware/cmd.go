@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
+	"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +23,7 @@ func NewCmdMiddleware(cfg *config.Config) *cobra.Command {
 		NewCmdDelete(cfg),
 		NewCmdGet(cfg),
 		NewCmdDescribe(cfg),
+		NewCmdUpgrade(cfg),
 	)
 	return cmd
 }

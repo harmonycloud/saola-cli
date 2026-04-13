@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/config"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	"gitee.com/opensaola/saola-cli/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

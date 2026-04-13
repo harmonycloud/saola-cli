@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/client"
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
-	"gitea.com/middleware-management/saola-cli/internal/printer"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
+	"gitee.com/opensaola/saola-cli/internal/printer"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -68,7 +70,7 @@ func NewCmdGet(cfg *config.Config) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&o.Namespace, "namespace", "n", "", lang.T("目标命名空间", "Target namespace"))
-	cmd.Flags().StringVarP(&o.Output, "output", "o", "table", lang.T("输出格式：table|yaml|json", "Output format: table|yaml|json"))
+	cmd.Flags().StringVarP(&o.Output, "output", "o", "table", lang.T("输出格式：table|wide|yaml|json|name", "Output format: table|wide|yaml|json|name"))
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", false, lang.T("列出所有命名空间下的资源", "List across all namespaces"))
 
 	return cmd
@@ -118,14 +120,37 @@ func (o *GetOptions) getSingle(ctx context.Context, cli sigs.Client, p printer.P
 		return fmt.Errorf("get MiddlewareOperator %s/%s: %w", ns, o.Name, err)
 	}
 
-	if o.Output == "table" || o.Output == "" {
+	switch o.Output {
+	case "yaml", "json":
+		return p.Print(os.Stdout, mo)
+	case "name":
+		// Output "operator/name" format.
+		//
+		// 输出 "operator/name" 格式。
+		np, ok := p.(*printer.NamePrinter)
+		if ok {
+			np.ResourceType = "operator"
+		}
+		return p.Print(os.Stdout, mo)
+	case "wide":
+		// Wide: include LABELS column.
+		//
+		// wide 模式：添加 LABELS 列。
+		rows := [][]string{
+			{"NAME", "NAMESPACE", "BASELINE", "STATE", "READY", "RUNTIME", "AGE", "LABELS"},
+			toWideRow(mo),
+		}
+		return p.Print(os.Stdout, rows)
+	default:
+		// Standard table output.
+		//
+		// 标准 table 输出。
 		rows := [][]string{
 			{"NAME", "NAMESPACE", "BASELINE", "STATE", "READY", "RUNTIME", "AGE"},
 			toRow(mo),
 		}
 		return p.Print(os.Stdout, rows)
 	}
-	return p.Print(os.Stdout, mo)
 }
 
 // list fetches all MiddlewareOperators in a namespace (or all namespaces).
@@ -149,7 +174,33 @@ func (o *GetOptions) list(ctx context.Context, cli sigs.Client, p printer.Printe
 		return fmt.Errorf("list MiddlewareOperators: %w", err)
 	}
 
-	if o.Output == "table" || o.Output == "" {
+	switch o.Output {
+	case "yaml", "json":
+		return p.Print(os.Stdout, moList)
+	case "name":
+		// Output "operator/name" per line.
+		//
+		// 每行输出 "operator/name"。
+		np, ok := p.(*printer.NamePrinter)
+		if ok {
+			np.ResourceType = "operator"
+		}
+		return p.Print(os.Stdout, moList)
+	case "wide":
+		// Wide: include LABELS column.
+		//
+		// wide 模式：添加 LABELS 列。
+		rows := [][]string{
+			{"NAME", "NAMESPACE", "BASELINE", "STATE", "READY", "RUNTIME", "AGE", "LABELS"},
+		}
+		for i := range moList.Items {
+			rows = append(rows, toWideRow(&moList.Items[i]))
+		}
+		return p.Print(os.Stdout, rows)
+	default:
+		// Standard table output.
+		//
+		// 标准 table 输出。
 		rows := [][]string{
 			{"NAME", "NAMESPACE", "BASELINE", "STATE", "READY", "RUNTIME", "AGE"},
 		}
@@ -158,12 +209,11 @@ func (o *GetOptions) list(ctx context.Context, cli sigs.Client, p printer.Printe
 		}
 		return p.Print(os.Stdout, rows)
 	}
-	return p.Print(os.Stdout, moList)
 }
 
-// toRow converts a MiddlewareOperator to a table row.
+// toRow converts a MiddlewareOperator to a standard table row.
 //
-// toRow 把 MiddlewareOperator 转换为表格行。
+// toRow 把 MiddlewareOperator 转换为标准表格行。
 func toRow(mo *zeusv1.MiddlewareOperator) []string {
 	ready := "false"
 	if mo.Status.Ready {
@@ -182,6 +232,34 @@ func toRow(mo *zeusv1.MiddlewareOperator) []string {
 		mo.Status.Runtime,
 		age,
 	}
+}
+
+// toWideRow converts a MiddlewareOperator to a wide table row (includes LABELS).
+//
+// toWideRow 把 MiddlewareOperator 转换为 wide 表格行（包含 LABELS 列）。
+func toWideRow(mo *zeusv1.MiddlewareOperator) []string {
+	return append(toRow(mo), formatLabelsShort(mo.Labels))
+}
+
+// formatLabelsShort converts a label map to a compact "k=v,k=v" string.
+// Keys are sorted for deterministic output. Returns "<none>" if the map is empty.
+//
+// 将 label map 转换为紧凑的 "k=v,k=v" 字符串。
+// key 排序以确保输出确定性；map 为空时返回 "<none>"。
+func formatLabelsShort(labels map[string]string) string {
+	if len(labels) == 0 {
+		return "<none>"
+	}
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, k+"="+labels[k])
+	}
+	return strings.Join(parts, ",")
 }
 
 // formatAge formats a duration into a human-readable age string.

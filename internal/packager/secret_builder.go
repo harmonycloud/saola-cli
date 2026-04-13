@@ -3,8 +3,8 @@ package packager
 import (
 	"strings"
 
-	"gitea.com/middleware-management/zeus-operator/pkg/service/consts"
-	"gitea.com/middleware-management/zeus-operator/pkg/service/packages"
+	"gitee.com/opensaola/opensaola/pkg/service/consts"
+	"gitee.com/opensaola/opensaola/pkg/service/packages"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"sync"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/config"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	"gitee.com/opensaola/saola-cli/internal/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -50,6 +51,10 @@ func (c *Client) Get() (client.Client, error) {
 		}
 		if err = appsv1.AddToScheme(scheme); err != nil {
 			c.initErr = fmt.Errorf("add appsv1 scheme: %w", err)
+			return
+		}
+		if err = storagev1.AddToScheme(scheme); err != nil {
+			c.initErr = fmt.Errorf("add storage/v1 scheme: %w", err)
 			return
 		}
 		if err = zeusv1.AddToScheme(scheme); err != nil {

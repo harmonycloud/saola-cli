@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/client"
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
-	"gitea.com/middleware-management/saola-cli/internal/printer"
-	"gitea.com/middleware-management/zeus-operator/pkg/service/packages"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
+	"gitee.com/opensaola/saola-cli/internal/printer"
+	"gitee.com/opensaola/opensaola/pkg/service/packages"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )

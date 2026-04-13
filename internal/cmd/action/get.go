@@ -7,11 +7,11 @@ import (
 	"text/tabwriter"
 	"time"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/client"
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
-	"gitea.com/middleware-management/saola-cli/internal/printer"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
+	"gitee.com/opensaola/saola-cli/internal/printer"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
@@ -112,7 +112,10 @@ func (o *GetOptions) Run(ctx context.Context) error {
 	//
 	// 列出资源列表。
 	list := &zeusv1.MiddlewareActionList{}
-	listOpts := []sigs.ListOption{sigs.InNamespace(ns)}
+	var listOpts []sigs.ListOption
+	if ns != "" {
+		listOpts = append(listOpts, sigs.InNamespace(ns))
+	}
 	if err = cli.List(ctx, list, listOpts...); err != nil {
 		return fmt.Errorf("list MiddlewareActions: %w", err)
 	}

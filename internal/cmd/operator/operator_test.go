@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/config"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	"gitee.com/opensaola/saola-cli/internal/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,10 +66,17 @@ func moYAML(name, namespace string) string {
 	if namespace != "" {
 		ns = "\n  namespace: " + namespace
 	}
+	// Include middleware.cn/packagename label so that enrichOperator skips
+	// auto-enrichment (no package Secrets required in the fake client).
+	//
+	// 预设 middleware.cn/packagename label，使 enrichOperator 跳过自动补全
+	// （fake client 中无需准备 package Secret）。
 	return `apiVersion: middleware.cn/v1
 kind: MiddlewareOperator
 metadata:
   name: ` + name + ns + `
+  labels:
+    middleware.cn/packagename: test-pkg
 spec:
   baseline: test-baseline
 `

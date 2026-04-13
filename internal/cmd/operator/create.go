@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"os"
 
-	zeusv1 "gitea.com/middleware-management/zeus-operator/api/v1"
-	"gitea.com/middleware-management/saola-cli/internal/client"
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
+	zeusv1 "gitee.com/opensaola/opensaola/api/v1"
+	zeusk8s "gitee.com/opensaola/opensaola/pkg/k8s"
+	"gitee.com/opensaola/opensaola/pkg/service/consts"
+	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
+	"gitee.com/opensaola/opensaola/pkg/service/packages"
+	"gitee.com/opensaola/saola-cli/internal/client"
+	"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
@@ -116,10 +120,147 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 		return fmt.Errorf("check existing MiddlewareOperator: %w", getErr)
 	}
 
+	// Auto-enrich labels required by zeus-operator before creating.
+	//
+	// 创建前自动补全 zeus-operator reconcile 所需的 labels。
+	if err = o.enrichOperator(ctx, cli, mo); err != nil {
+		return err
+	}
+
 	if err = cli.Create(ctx, mo); err != nil {
 		return fmt.Errorf("create MiddlewareOperator: %w", err)
 	}
 
 	fmt.Fprintf(os.Stdout, "middlewareoperator/%s created\n", mo.Name)
+	return nil
+}
+
+
+// enrichOperator auto-completes the four labels that zeus-operator requires to
+// reconcile a MiddlewareOperator CR successfully.
+//
+// It is a no-op when mo.Spec.Baseline is empty (caller may have set labels manually)
+// or when mo.Labels[consts.LabelPackageName] is already set.
+//
+// enrichOperator 自动补全 zeus-operator reconcile 所需的四个 label；
+// 若 spec.baseline 为空或 LabelPackageName 已存在则跳过。
+func (o *CreateOptions) enrichOperator(ctx context.Context, cli sigs.Client, mo *zeusv1.MiddlewareOperator) error {
+	// Defensively set the package namespace first, regardless of early-return
+	// paths, so that any future packages.Get* call resolves from the correct ns.
+	//
+	// 防御性地先设置包命名空间，无论后续是否提前返回，确保 packages 系列函数
+	// 始终从正确的命名空间读取 Secret。
+	packages.SetDataNamespace(o.Config.PkgNamespace)
+
+	// spec.baseline is empty — skip enrichment silently; the user may have
+	// manually set all required labels.
+	//
+	// spec.baseline 为空时静默跳过；用户可能已手动设置了所有必要 label。
+	if mo.Spec.Baseline == "" {
+		return nil
+	}
+
+	// Skip auto-enrichment when the caller has already supplied the package label.
+	//
+	// 如果调用方已经设置了包名 label，则跳过自动补全。
+	if mo.Labels != nil && mo.Labels[consts.LabelPackageName] != "" {
+		return nil
+	}
+
+	// List all enabled package Secrets in the package namespace.
+	//
+	// 列出包命名空间中所有已启用的包 Secret。
+	secrets, err := zeusk8s.GetSecrets(ctx, cli, o.Config.PkgNamespace, sigs.MatchingLabels{
+		consts.LabelProject: consts.ProjectZeusOperator,
+		consts.LabelEnabled: "true",
+	})
+	if err != nil {
+		return fmt.Errorf("list package secrets: %w", err)
+	}
+
+	// Iterate over each package and look for a MiddlewareOperatorBaseline whose
+	// name matches mo.Spec.Baseline.
+	//
+	// 遍历每个包，在其 MiddlewareOperatorBaseline 列表中查找名称匹配 mo.Spec.Baseline 的条目。
+	var (
+		matchedSecretName string
+		matchedFound      bool
+	)
+	for i := range secrets.Items {
+		secret := &secrets.Items[i]
+		baselines, bErr := packages.GetMiddlewareOperatorBaselines(ctx, cli, secret.Name)
+		if bErr != nil {
+			// A parse error in one package should not block the whole operation;
+			// log a warning and continue.
+			//
+			// 单个包解析失败不应阻断整个流程，打印警告后继续。
+			fmt.Fprintf(os.Stderr, "warning: skip package %s: %v\n", secret.Name, bErr)
+			continue
+		}
+		for _, bl := range baselines {
+			if bl.Name == mo.Spec.Baseline {
+				matchedSecretName = secret.Name
+				matchedFound = true
+				break
+			}
+		}
+		if matchedFound {
+			break
+		}
+	}
+
+	if !matchedFound {
+		// No installed package contains the requested baseline — fail fast so the
+		// user gets a clear error rather than a zombied MiddlewareOperator missing
+		// the four labels that zeus-operator requires to reconcile successfully.
+		//
+		// 未找到包含目标 baseline 的已安装包时报错，避免 MiddlewareOperator 缺少
+		// zeus-operator reconcile 所需的四个 label 而进入僵尸状态。
+		return fmt.Errorf(
+			"no installed package contains MiddlewareOperatorBaseline %q in namespace %q; "+
+				"install the package first or set the four required labels manually",
+			mo.Spec.Baseline, o.Config.PkgNamespace,
+		)
+	}
+
+	// Retrieve the matched package Secret to read its component and version labels.
+	//
+	// 获取匹配的包 Secret，读取 component 和 version label。
+	pkgSecret, err := zeusk8s.GetSecret(ctx, cli, matchedSecretName, o.Config.PkgNamespace)
+	if err != nil {
+		return fmt.Errorf("get package secret %s: %w", matchedSecretName, err)
+	}
+
+	// Initialise Labels map if the manifest did not include any labels.
+	//
+	// 如果 manifest 未携带任何 label，初始化 Labels map。
+	if mo.Labels == nil {
+		mo.Labels = make(map[string]string)
+	}
+
+	// Set the four labels required by the zeus-operator reconciler.
+	//
+	// 设置 zeus-operator reconciler 所需的四个 label。
+	mo.Labels[consts.LabelPackageName] = matchedSecretName
+	mo.Labels[consts.LabelPackageVersion] = pkgSecret.Labels[consts.LabelPackageVersion]
+	mo.Labels[consts.LabelComponent] = pkgSecret.Labels[consts.LabelComponent]
+	mo.Labels[saolaconsts.LabelDefinition] = mo.Spec.Baseline
+
+	// Print a summary of what was auto-completed so the user can verify.
+	//
+	// 打印自动补全摘要，便于用户核查。
+	fmt.Fprintf(os.Stdout,
+		"auto-enriched middlewareoperator %q:\n"+
+			"  %s=%s\n"+
+			"  %s=%s\n"+
+			"  %s=%s\n"+
+			"  %s=%s\n",
+		mo.Name,
+		consts.LabelPackageName, mo.Labels[consts.LabelPackageName],
+		consts.LabelPackageVersion, mo.Labels[consts.LabelPackageVersion],
+		consts.LabelComponent, mo.Labels[consts.LabelComponent],
+		saolaconsts.LabelDefinition, mo.Labels[saolaconsts.LabelDefinition],
+	)
+
 	return nil
 }

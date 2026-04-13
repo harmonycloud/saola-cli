@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitea.com/middleware-management/zeus-operator/pkg/service/packages"
-	"gitea.com/middleware-management/zeus-operator/pkg/tools"
+	"gitee.com/opensaola/opensaola/pkg/service/packages"
+	"gitee.com/opensaola/opensaola/pkg/tools"
 )
 
 // makeDir creates a temporary directory populated with the given files (relative path → content).

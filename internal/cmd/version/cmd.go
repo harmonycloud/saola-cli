@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"gitea.com/middleware-management/saola-cli/internal/config"
-	"gitea.com/middleware-management/saola-cli/internal/lang"
-	"gitea.com/middleware-management/saola-cli/internal/printer"
-	internalversion "gitea.com/middleware-management/saola-cli/internal/version"
+	"gitee.com/opensaola/saola-cli/internal/config"
+	"gitee.com/opensaola/saola-cli/internal/lang"
+	"gitee.com/opensaola/saola-cli/internal/printer"
+	internalversion "gitee.com/opensaola/saola-cli/internal/version"
 	"github.com/spf13/cobra"
 )
 
