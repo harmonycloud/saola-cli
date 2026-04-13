@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"os"
 
-	zeusv1 "github.com/OpenSaola/opensaola/api/v1"
+	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"gitee.com/opensaola/saola-cli/internal/client"
 	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
 	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"

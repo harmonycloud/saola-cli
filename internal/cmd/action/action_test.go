@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	zeusv1 "github.com/OpenSaola/opensaola/api/v1"
+	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

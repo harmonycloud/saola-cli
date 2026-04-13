@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	zeusv1 "github.com/OpenSaola/opensaola/api/v1"
+	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"gitee.com/opensaola/saola-cli/internal/client"
 	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
 	"gitee.com/opensaola/saola-cli/internal/config"

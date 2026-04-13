@@ -2,12 +2,12 @@ module gitee.com/opensaola/saola-cli
 
 go 1.26.1
 
-// TODO: Remove this replace once github.com/OpenSaola/opensaola is published.
+// TODO: Remove this replace once github.com/opensaola/opensaola is published.
 // Temporarily redirect to gitee mirror.
-replace github.com/OpenSaola/opensaola => gitee.com/opensaola/opensaola v0.1.0
+replace github.com/opensaola/opensaola => gitee.com/opensaola/opensaola v0.1.0
 
 require (
-	github.com/OpenSaola/opensaola v0.1.0
+	github.com/opensaola/opensaola v0.1.0
 	github.com/charmbracelet/huh v1.0.0
 	github.com/klauspost/compress v1.18.0
 	github.com/prometheus/client_golang v1.23.2

@@ -19,7 +19,7 @@ package packager
 import (
 	"strings"
 
-	zeusv1 "github.com/OpenSaola/opensaola/api/v1"
+	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

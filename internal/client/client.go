@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	zeusv1 "github.com/OpenSaola/opensaola/api/v1"
+	zeusv1 "github.com/opensaola/opensaola/api/v1"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
