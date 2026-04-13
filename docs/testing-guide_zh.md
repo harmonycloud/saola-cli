@@ -210,17 +210,24 @@ $SAOLA get middleware -n $NS -o json
 $SAOLA get operator -n $NS -o wide
 ```
 
-### 步骤 11：清理
+### 步骤 11：删除生命周期
 
 ```bash
-# 删除 Middleware 实例
+# 删除 Middleware
 $SAOLA delete middleware my-clickhouse -n $NS
+# 等待并验证
+sleep 30
+kubectl get mid -n $NS   # 应为空
+kubectl get pods -n $NS  # Middleware Pod 应已消失
 
 # 删除 Operator
 $SAOLA delete operator clickhouse-operator -n $NS
+sleep 15
+kubectl get mo -n $NS    # 应为空
 
 # 卸载包
-$SAOLA uninstall <pkg-name> --pkg-namespace $PKG_NS
+$SAOLA uninstall $PKG_NAME --pkg-namespace $PKG_NS
+kubectl get secrets -n $PKG_NS -l middleware.cn/project=opensaola  # 应显示卸载注解
 
 # 删除测试命名空间
 kubectl delete namespace $NS

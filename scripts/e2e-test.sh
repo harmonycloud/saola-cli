@@ -115,6 +115,32 @@ $SAOLA get middleware -n $NS -o yaml 2>&1 | head -10
 $SAOLA get operator -n $NS -o json 2>&1 | head -10
 $SAOLA --lang en get all -n $NS
 
+# Phase E: Cleanup
+echo ""
+echo "=== Phase E: Cleanup ==="
+
+if [ -f "$SAMPLES/clickhouse-middleware.yaml" ]; then
+  echo "--- E1: Delete Middleware ---"
+  kubectl delete -f $SAMPLES/clickhouse-middleware.yaml --timeout=120s 2>/dev/null || true
+  sleep 10
+fi
+
+if [ -f "$SAMPLES/clickhouse-operator.yaml" ]; then
+  echo "--- E2: Delete Operator ---"
+  kubectl delete -f $SAMPLES/clickhouse-operator.yaml --timeout=120s 2>/dev/null || true
+  sleep 10
+fi
+
+echo "--- E3: Uninstall Package ---"
+$SAOLA uninstall $PKG_NAME --pkg-namespace $PKG_NS 2>/dev/null || true
+
+echo "--- E4: Verify cleanup ---"
+sleep 10
+echo "Remaining resources in $NS:"
+kubectl get middleware,middlewareoperator -n $NS 2>/dev/null || echo "  (none)"
+echo "Remaining packages in $PKG_NS:"
+kubectl get secrets -n $PKG_NS -l middleware.cn/project=opensaola 2>/dev/null || echo "  (none)"
+
 echo ""
 echo "========================================="
 echo "  saola-cli E2E TEST PASSED"

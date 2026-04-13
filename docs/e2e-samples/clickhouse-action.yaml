@@ -1,0 +1,32 @@
+# MiddlewareAction E2E Sample for ClickHouse
+#
+# This file defines a MiddlewareAction that applies the "pre-operator-tolerations"
+# action baseline to the ClickHouse middleware instance "my-clickhouse".
+#
+# Prerequisites:
+#   1. The middleware package must be installed first:
+#        saola run docs/e2e-samples/clickhouse-operator.yaml
+#        saola run docs/e2e-samples/clickhouse-middleware.yaml
+#   2. The package (clickhouse-0.25.5-1.0.0) must contain the action baseline
+#      "pre-clickhouse-operator-tolerations" in its actions/ directory.
+#
+# Usage:
+#   saola run docs/e2e-samples/clickhouse-action.yaml
+#
+apiVersion: middleware.cn/v1
+kind: MiddlewareAction
+metadata:
+  name: my-clickhouse-tolerations
+  namespace: e2e-test
+  labels:
+    middleware.cn/component: ClickHouse
+    middleware.cn/packagename: clickhouse-0.25.5-1.0.0
+spec:
+  baseline: pre-clickhouse-operator-tolerations
+  middlewareName: my-clickhouse
+  necessary:
+    tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "clickhouse"
+        effect: "NoSchedule"
