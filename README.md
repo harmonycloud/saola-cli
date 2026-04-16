@@ -5,7 +5,7 @@
 
 **English** | [中文](README_zh.md)
 
-The command-line tool for [OpenSaola](https://gitee.com/opensaola/opensaola) — manage middleware lifecycle on Kubernetes: package installation, instance creation, status monitoring, version upgrades, and resource cleanup.
+The command-line tool for [OpenSaola](https://github.com/harmonycloud/opensaola) — manage middleware lifecycle on Kubernetes: package installation, instance creation, status monitoring, version upgrades, and resource cleanup.
 
 ## Features
 
@@ -16,12 +16,26 @@ The command-line tool for [OpenSaola](https://gitee.com/opensaola/opensaola) —
 - **Instance upgrades** — annotation-driven rolling upgrades with `--wait` for completion
 - **Multiple output formats** — `table`/`yaml`/`json`/`wide`/`name` for easy scripting
 
+## Supported Middleware
+
+Saola manages the following middleware through OpenSaola operator packages:
+
+| Middleware | Description | Repository |
+|-----------|-------------|------------|
+| MySQL | Relational database with master-slave and proxy modes | [harmonycloud/mysql](https://github.com/harmonycloud/mysql) |
+| PostgreSQL | Advanced relational database with high-availability | [harmonycloud/postgresql](https://github.com/harmonycloud/postgresql) |
+| Apache Kafka | Distributed event streaming platform | [harmonycloud/kafka](https://github.com/harmonycloud/kafka) |
+| Redis | In-memory data store with sentinel and cluster modes | [harmonycloud/redis](https://github.com/harmonycloud/redis) |
+| Elasticsearch | Distributed search and analytics engine | [harmonycloud/elasticsearch](https://github.com/harmonycloud/elasticsearch) |
+| Apache ZooKeeper | Distributed coordination service | [harmonycloud/zookeeper](https://github.com/harmonycloud/zookeeper) |
+| RabbitMQ | Message broker with AMQP support | [harmonycloud/rabbitmq](https://github.com/harmonycloud/rabbitmq) |
+
 ## Installation
 
 ### Build from source
 
 ```bash
-git clone https://gitee.com/opensaola/saola-cli.git
+git clone https://github.com/harmonycloud/saola-cli.git
 cd saola-cli
 make build
 ```
@@ -35,7 +49,7 @@ cp bin/saola /usr/local/bin/
 ### go install
 
 ```bash
-go install gitee.com/opensaola/saola-cli/cmd/saola@latest
+go install github.com/harmonycloud/saola-cli/cmd/saola@latest
 ```
 
 ## Quick Start
@@ -206,7 +220,7 @@ saola version
 
 ## Managed CRD Types
 
-Saola manages the following Kubernetes custom resources via the [OpenSaola](https://gitee.com/opensaola/opensaola) operator:
+Saola manages the following Kubernetes custom resources via the [OpenSaola](https://github.com/harmonycloud/opensaola) operator:
 
 | CRD | Short | Description |
 |-----|-------|-------------|
@@ -221,9 +235,9 @@ Saola manages the following Kubernetes custom resources via the [OpenSaola](http
 
 - [Usage Guide](docs/saola-cli-usage.md) | [Usage Guide (English)](docs/saola-cli-usage_en.md)
 - [Testing Guide](docs/testing-guide.md) | [Testing Guide (Chinese)](docs/testing-guide_zh.md)
-- [OpenSaola Technical Documentation](https://gitee.com/opensaola/opensaola/blob/master/docs/opensaola-technical.md)
-- [Package Authoring Guide](https://gitee.com/opensaola/opensaola/blob/master/docs/opensaola-packaging.md)
-- [Troubleshooting Guide](https://gitee.com/opensaola/opensaola/blob/master/docs/troubleshooting.md)
+- [OpenSaola Technical Documentation](https://github.com/harmonycloud/opensaola/blob/master/docs/opensaola-technical.md)
+- [Package Authoring Guide](https://github.com/harmonycloud/opensaola/blob/master/docs/opensaola-packaging.md)
+- [Troubleshooting Guide](https://github.com/harmonycloud/opensaola/blob/master/docs/troubleshooting.md)
 
 ## Contributing
 
