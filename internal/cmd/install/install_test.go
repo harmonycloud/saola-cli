@@ -19,7 +19,7 @@ package install
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdInstall_Structure verifies that the "install" command has the

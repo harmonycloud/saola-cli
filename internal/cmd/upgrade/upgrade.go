@@ -17,11 +17,11 @@ limitations under the License.
 package upgrade
 
 import (
-	"gitee.com/opensaola/saola-cli/internal/cmd/middleware"
-	"gitee.com/opensaola/saola-cli/internal/cmd/operator"
-	"gitee.com/opensaola/saola-cli/internal/cmd/pkgcmd"
-	"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/cmd/middleware"
+	"github.com/harmonycloud/saola-cli/internal/cmd/operator"
+	"github.com/harmonycloud/saola-cli/internal/cmd/pkgcmd"
+	"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 )
 

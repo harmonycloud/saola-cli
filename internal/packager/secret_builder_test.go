@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
+	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
 )
 
 // newTestMeta is a helper that returns a minimal Metadata for tests.

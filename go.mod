@@ -1,11 +1,11 @@
-module gitee.com/opensaola/saola-cli
+module github.com/harmonycloud/saola-cli
 
 go 1.26.1
 
 require (
 	github.com/charmbracelet/huh v1.0.0
+	github.com/harmonycloud/opensaola v0.1.2
 	github.com/klauspost/compress v1.18.5
-	github.com/harmonycloud/opensaola v0.1.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1

@@ -17,8 +17,8 @@ limitations under the License.
 package middleware
 
 import (
-	"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 )
 

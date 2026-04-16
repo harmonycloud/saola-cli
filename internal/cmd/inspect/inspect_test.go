@@ -19,7 +19,7 @@ package inspect
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdInspect_Structure verifies that the "inspect" command has the

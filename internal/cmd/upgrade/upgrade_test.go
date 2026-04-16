@@ -19,7 +19,7 @@ package upgrade
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdUpgrade_HasSubcommands verifies that the "upgrade" command registers

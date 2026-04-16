@@ -19,7 +19,7 @@ package run
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdRun_Structure verifies that the "run" command has the correct

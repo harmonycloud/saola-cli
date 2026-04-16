@@ -19,7 +19,7 @@ package describe
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdDescribe_HasSubcommands verifies that the "describe" command registers

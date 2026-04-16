@@ -31,9 +31,9 @@ import (
 	"time"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	"gitee.com/opensaola/saola-cli/internal/tarutil"
-	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
-	k8shelper "gitee.com/opensaola/saola-cli/internal/k8s"
+	"github.com/harmonycloud/saola-cli/internal/tarutil"
+	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
+	k8shelper "github.com/harmonycloud/saola-cli/internal/k8s"
 	"github.com/klauspost/compress/zstd"
 	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"

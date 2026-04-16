@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
+	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

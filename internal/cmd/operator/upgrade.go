@@ -23,10 +23,10 @@ import (
 	"time"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	"gitee.com/opensaola/saola-cli/internal/client"
-	zeusk8s "gitee.com/opensaola/saola-cli/internal/k8s"
-	"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/client"
+	zeusk8s "github.com/harmonycloud/saola-cli/internal/k8s"
+	"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )

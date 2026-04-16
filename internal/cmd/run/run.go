@@ -21,9 +21,9 @@ package run
 // run 包提供顶层 "saola run" 命令。
 
 import (
-	"gitee.com/opensaola/saola-cli/internal/cmd/action"
-	"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/cmd/action"
+	"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 )
 

@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"os"
 
-	"gitee.com/opensaola/saola-cli/internal/client"
-	"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/lang"
-	"gitee.com/opensaola/saola-cli/internal/printer"
-	"gitee.com/opensaola/saola-cli/internal/packages"
+	"github.com/harmonycloud/saola-cli/internal/client"
+	"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/printer"
+	"github.com/harmonycloud/saola-cli/internal/packages"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )

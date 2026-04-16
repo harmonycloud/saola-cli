@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"os"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/lang"
-	"gitee.com/opensaola/saola-cli/internal/printer"
-	internalversion "gitee.com/opensaola/saola-cli/internal/version"
+	"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/printer"
+	internalversion "github.com/harmonycloud/saola-cli/internal/version"
 	"github.com/spf13/cobra"
 )
 

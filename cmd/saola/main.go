@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitee.com/opensaola/saola-cli/internal/app"
+	"github.com/harmonycloud/saola-cli/internal/app"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

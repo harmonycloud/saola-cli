@@ -21,9 +21,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/lang"
-	"gitee.com/opensaola/saola-cli/internal/packager"
+	"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/packager"
 	"github.com/spf13/cobra"
 )
 

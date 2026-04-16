@@ -25,8 +25,8 @@ import (
 	"strings"
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/packages"
-	"gitee.com/opensaola/saola-cli/internal/tarutil"
+	"github.com/harmonycloud/saola-cli/internal/packages"
+	"github.com/harmonycloud/saola-cli/internal/tarutil"
 )
 
 // makeDir creates a temporary directory populated with the given files (relative path → content).

@@ -19,7 +19,7 @@ package delete
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdDelete_HasSubcommands verifies that the "delete" command registers

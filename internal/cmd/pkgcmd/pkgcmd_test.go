@@ -23,10 +23,10 @@ import (
 	"strings"
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/packager"
+	"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/packager"
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
+	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

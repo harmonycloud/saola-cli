@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"

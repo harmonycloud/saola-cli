@@ -19,7 +19,7 @@ package version
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdVersion_Structure verifies that the "version" command has the

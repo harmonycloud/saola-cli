@@ -23,9 +23,9 @@ import (
 	"time"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	"gitee.com/opensaola/saola-cli/internal/client"
-	"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/client"
+	"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"

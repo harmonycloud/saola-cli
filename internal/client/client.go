@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"

@@ -19,7 +19,7 @@ package build
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdBuild_Structure verifies that the "build" command has the correct

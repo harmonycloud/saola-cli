@@ -24,7 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitee.com/opensaola/saola-cli/internal/packages"
+	"github.com/harmonycloud/saola-cli/internal/packages"
 	"gopkg.in/yaml.v3"
 )
 

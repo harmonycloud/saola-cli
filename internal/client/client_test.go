@@ -19,7 +19,7 @@ package client
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestClient_InvalidKubeconfig verifies that Get returns an error when the

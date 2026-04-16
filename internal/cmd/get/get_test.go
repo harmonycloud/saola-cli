@@ -19,7 +19,7 @@ package get
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdGet_HasSubcommands verifies that the "get" command registers all

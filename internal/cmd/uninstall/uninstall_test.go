@@ -19,7 +19,7 @@ package uninstall
 import (
 	"testing"
 
-	"gitee.com/opensaola/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 )
 
 // TestNewCmdUninstall_Structure verifies that the "uninstall" command has the

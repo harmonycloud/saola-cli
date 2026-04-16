@@ -20,20 +20,20 @@ import (
 	// New kubectl-style verb commands.
 	//
 	// 新的 kubectl 风格动词命令。
-	buildcmd "gitee.com/opensaola/saola-cli/internal/cmd/build"
-	createcmd "gitee.com/opensaola/saola-cli/internal/cmd/create"
-	deletecmd "gitee.com/opensaola/saola-cli/internal/cmd/delete"
-	describecmd "gitee.com/opensaola/saola-cli/internal/cmd/describe"
-	getcmd "gitee.com/opensaola/saola-cli/internal/cmd/get"
-	inspectcmd "gitee.com/opensaola/saola-cli/internal/cmd/inspect"
-	installcmd "gitee.com/opensaola/saola-cli/internal/cmd/install"
-	runcmd "gitee.com/opensaola/saola-cli/internal/cmd/run"
-	uninstallcmd "gitee.com/opensaola/saola-cli/internal/cmd/uninstall"
-	upgradecmd "gitee.com/opensaola/saola-cli/internal/cmd/upgrade"
-	versioncmd "gitee.com/opensaola/saola-cli/internal/cmd/version"
+	buildcmd "github.com/harmonycloud/saola-cli/internal/cmd/build"
+	createcmd "github.com/harmonycloud/saola-cli/internal/cmd/create"
+	deletecmd "github.com/harmonycloud/saola-cli/internal/cmd/delete"
+	describecmd "github.com/harmonycloud/saola-cli/internal/cmd/describe"
+	getcmd "github.com/harmonycloud/saola-cli/internal/cmd/get"
+	inspectcmd "github.com/harmonycloud/saola-cli/internal/cmd/inspect"
+	installcmd "github.com/harmonycloud/saola-cli/internal/cmd/install"
+	runcmd "github.com/harmonycloud/saola-cli/internal/cmd/run"
+	uninstallcmd "github.com/harmonycloud/saola-cli/internal/cmd/uninstall"
+	upgradecmd "github.com/harmonycloud/saola-cli/internal/cmd/upgrade"
+	versioncmd "github.com/harmonycloud/saola-cli/internal/cmd/version"
 
-"gitee.com/opensaola/saola-cli/internal/config"
-	"gitee.com/opensaola/saola-cli/internal/lang"
+"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 )
 
