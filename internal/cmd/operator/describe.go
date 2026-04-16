@@ -27,7 +27,7 @@ import (
 	"gitee.com/opensaola/saola-cli/internal/cmdutil"
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/lang"
-	zeusv1 "github.com/opensaola/opensaola/api/v1"
+	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/spf13/cobra"
 	appsv1 "k8s.io/api/apps/v1"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"

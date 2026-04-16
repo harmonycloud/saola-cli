@@ -25,7 +25,7 @@ import (
 
 	"gitee.com/opensaola/saola-cli/internal/config"
 	"gitee.com/opensaola/saola-cli/internal/packager"
-	zeusv1 "github.com/opensaola/opensaola/api/v1"
+	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	saolaconsts "gitee.com/opensaola/saola-cli/internal/consts"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

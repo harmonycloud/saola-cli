@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	zeusv1 "github.com/opensaola/opensaola/api/v1"
+	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
