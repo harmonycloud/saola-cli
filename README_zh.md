@@ -1,3 +1,5 @@
+[English](README.md) | [中文](README_zh.md)
+
 # Saola CLI
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
