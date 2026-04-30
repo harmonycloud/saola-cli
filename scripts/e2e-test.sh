@@ -11,6 +11,8 @@ NS=${NS:-e2e-test}
 SAMPLES=${SAMPLES:-./docs/e2e-samples}
 OPENSAOLA_DIR=${OPENSAOLA_DIR:-../opensaola}
 OPERATOR_IMG=${OPERATOR_IMG:-opensaola:latest}
+PKG_NAME=${PKG_NAME:-}
+EXPECTED_CH_PODS=${EXPECTED_CH_PODS:-4}
 
 if [ -z "$PKG_DIR" ]; then
   echo "Usage: PKG_DIR=/path/to/middleware/package ./scripts/e2e-test.sh"
@@ -38,9 +40,14 @@ cleanup() {
   echo ""
   echo "=== Cleanup (exit code: $exit_code) ==="
   kubectl delete -f "$SAMPLES/clickhouse-middleware.yaml" --timeout=60s 2>/dev/null || true
+  kubectl wait --for=delete middleware --all -n "$NS" --timeout=300s 2>/dev/null || true
+  kubectl wait --for=delete chi --all -n "$NS" --timeout=300s 2>/dev/null || true
   kubectl delete -f "$SAMPLES/clickhouse-operator.yaml" --timeout=60s 2>/dev/null || true
-  kubectl wait --for=delete middleware --all -n "$NS" --timeout=60s 2>/dev/null || true
-  "$SAOLA" uninstall "$PKG_NAME" --pkg-namespace "$PKG_NS" 2>/dev/null || true
+  kubectl wait --for=delete middlewareoperator --all -n "$NS" --timeout=120s 2>/dev/null || true
+  if [ -n "$PKG_NAME" ]; then
+    "$SAOLA" uninstall "$PKG_NAME" --pkg-namespace "$PKG_NS" --wait 5m 2>/dev/null || true
+    kubectl delete secret "$PKG_NAME" -n "$PKG_NS" --ignore-not-found=true 2>/dev/null || true
+  fi
   exit $exit_code
 }
 trap cleanup EXIT
@@ -94,7 +101,7 @@ echo "--- A1: Install package ---"
 echo "--- A2: Get package ---"
 "$SAOLA" get package --pkg-namespace "$PKG_NS"
 
-PKG_NAME=$("$SAOLA" get package --pkg-namespace "$PKG_NS" -o name 2>/dev/null | head -1 | sed 's|package/||')
+PKG_NAME=$("$SAOLA" get package --pkg-namespace "$PKG_NS" -o name 2>/dev/null | sed -n '1p' | sed 's|package/||')
 if [ -z "$PKG_NAME" ]; then
   echo "FAIL: Could not determine package name"
   exit 1
@@ -102,7 +109,7 @@ fi
 echo "Package name: $PKG_NAME"
 
 echo "--- A3: Inspect ---"
-"$SAOLA" inspect "$PKG_NAME" --pkg-namespace "$PKG_NS" 2>&1 | head -15
+"$SAOLA" inspect "$PKG_NAME" --pkg-namespace "$PKG_NS" 2>&1 | sed -n '1,15p'
 
 echo "--- A4: Baselines ---"
 "$SAOLA" get baseline --package "$PKG_NAME" --pkg-namespace "$PKG_NS"
@@ -139,7 +146,7 @@ if [ -f "$SAMPLES/clickhouse-operator.yaml" ]; then
   kubectl get pods -n "$NS"
 
   echo "--- B4a: Verify operator pods ---"
-  OP_READY=$(kubectl get pods -n "$NS" --no-headers 2>/dev/null | grep -c Running || echo 0)
+  OP_READY=$(kubectl get pods -n "$NS" --no-headers 2>/dev/null | awk '$1 ~ /^clickhouse-operator/ && $3 == "Running" { count++ } END { print count + 0 }')
   echo "Operator pods running: $OP_READY"
   if [ "$OP_READY" -lt 1 ]; then
     echo "FAIL: No operator pods running"
@@ -177,20 +184,39 @@ if [ -f "$SAMPLES/clickhouse-middleware.yaml" ]; then
   "$SAOLA" get all -n "$NS"
   kubectl get pods -n "$NS"
 
-  echo "--- C3a: Verify actual workload health ---"
-  CH_RUNNING=$(kubectl get pods -n "$NS" -l clickhouse.altinity.com/chi=my-clickhouse --no-headers 2>/dev/null | grep -c Running || echo 0)
-  CH_TOTAL=$(kubectl get pods -n "$NS" -l clickhouse.altinity.com/chi=my-clickhouse --no-headers 2>/dev/null | wc -l | tr -d ' ')
-  echo "ClickHouse pods: $CH_RUNNING/$CH_TOTAL Running"
-  if [ "$CH_RUNNING" -lt 2 ]; then
-    echo "FAIL: Expected at least 2 ClickHouse pods running, got $CH_RUNNING"
-    kubectl get pods -n "$NS" 2>/dev/null || true
-    exit 1
-  fi
-  CHI_STATUS=$(kubectl get chi my-clickhouse -n "$NS" -o jsonpath='{.status.status}' 2>/dev/null || echo "unknown")
-  echo "ClickHouseInstallation status: $CHI_STATUS"
+  echo "--- C3a: Wait for ClickHouse workload health (max 8min) ---"
+  for i in $(seq 1 96); do
+    CH_RUNNING=$(kubectl get pods -n "$NS" -l clickhouse.altinity.com/chi=my-clickhouse --no-headers 2>/dev/null | awk '$3 == "Running" { count++ } END { print count + 0 }')
+    CH_TOTAL=$(kubectl get pods -n "$NS" -l clickhouse.altinity.com/chi=my-clickhouse --no-headers 2>/dev/null | awk 'END { print NR + 0 }')
+    CHI_STATUS=$(kubectl get chi my-clickhouse -n "$NS" -o jsonpath='{.status.status}' 2>/dev/null || echo "unknown")
+    echo "ClickHouse health attempt $i: pods $CH_RUNNING/$CH_TOTAL Running, CHI=$CHI_STATUS"
+    if [ "$CH_RUNNING" -ge "$EXPECTED_CH_PODS" ] && [ "$CH_TOTAL" -ge "$EXPECTED_CH_PODS" ] && [ "$CHI_STATUS" = "Completed" ]; then
+      break
+    fi
+    if [ "$i" -eq 96 ]; then
+      echo "FAIL: ClickHouse workload not healthy after 8 minutes"
+      kubectl get chi,pods,svc,pvc -n "$NS" 2>/dev/null || true
+      exit 1
+    fi
+    sleep 5
+  done
   SVC_COUNT=$(kubectl get svc -n "$NS" --no-headers 2>/dev/null | wc -l | tr -d ' ')
   PVC_COUNT=$(kubectl get pvc -n "$NS" --no-headers 2>/dev/null | wc -l | tr -d ' ')
   echo "Services: $SVC_COUNT, PVCs: $PVC_COUNT"
+
+  echo "--- C3b: Verify ClickHouse SQL smoke ---"
+  CH_POD=$(kubectl get pods -n "$NS" -l clickhouse.altinity.com/chi=my-clickhouse -o jsonpath='{.items[0].metadata.name}')
+  kubectl exec -n "$NS" "$CH_POD" -- clickhouse-client --query "SELECT 1"
+  kubectl exec -n "$NS" "$CH_POD" -- clickhouse-client --query "DROP TABLE IF EXISTS saola_e2e_smoke"
+  kubectl exec -n "$NS" "$CH_POD" -- clickhouse-client --query "CREATE TABLE saola_e2e_smoke (id UInt8, value UInt8) ENGINE = Memory"
+  kubectl exec -n "$NS" "$CH_POD" -- clickhouse-client --query "INSERT INTO saola_e2e_smoke VALUES (2, 3)"
+  SQL_RESULT=$(kubectl exec -n "$NS" "$CH_POD" -- clickhouse-client --query "SELECT id, value FROM saola_e2e_smoke ORDER BY id FORMAT TSV")
+  kubectl exec -n "$NS" "$CH_POD" -- clickhouse-client --query "DROP TABLE saola_e2e_smoke"
+  if [ "$SQL_RESULT" != $'2\t3' ]; then
+    echo "FAIL: Unexpected ClickHouse SQL result: $SQL_RESULT"
+    exit 1
+  fi
+  echo "ClickHouse SQL result: $SQL_RESULT"
 else
   echo "SKIP: Phase C — no middleware sample at $SAMPLES/clickhouse-middleware.yaml"
 fi
@@ -201,9 +227,13 @@ if [ -f "$SAMPLES/clickhouse-middleware.yaml" ]; then
   echo "=== Phase C.5: Middleware Upgrade Test ==="
 
   # Get current package version for the annotation
-  PKG_VERSION=$(kubectl get mid my-clickhouse -n "$NS" -o jsonpath='{.metadata.labels.middleware\.cn/packageversion}' 2>/dev/null)
+  PKG_VERSION=$(kubectl get secret "$PKG_NAME" -n "$PKG_NS" -o jsonpath='{.metadata.labels.middleware\.cn/packageversion}' 2>/dev/null || true)
   if [ -z "$PKG_VERSION" ]; then
-    PKG_VERSION=$(echo "$PKG_NAME" | sed 's/.*-\([0-9].*\)/\1/')
+    PKG_VERSION=$(kubectl get mid my-clickhouse -n "$NS" -o jsonpath='{.metadata.labels.middleware\.cn/packageversion}' 2>/dev/null || true)
+  fi
+  if [ -z "$PKG_VERSION" ]; then
+    echo "FAIL: Could not determine package version for upgrade"
+    exit 1
   fi
   echo "Current package version: $PKG_VERSION"
 
@@ -229,14 +259,21 @@ if [ -f "$SAMPLES/clickhouse-middleware.yaml" ]; then
     fi
     sleep 5
   done
+
+  UPDATE_ANNOTATION=$(kubectl get mid my-clickhouse -n "$NS" -o jsonpath='{.metadata.annotations.middleware\.cn/update}' 2>/dev/null || true)
+  if [ -n "$UPDATE_ANNOTATION" ]; then
+    echo "FAIL: Upgrade annotation was not cleared: $UPDATE_ANNOTATION"
+    kubectl get mid my-clickhouse -n "$NS" -o yaml 2>/dev/null || true
+    exit 1
+  fi
 fi
 
 # Phase D: Output formats
 echo ""
 echo "=== Phase D: Output Formats ==="
 "$SAOLA" get all -n "$NS"
-"$SAOLA" get middleware -n "$NS" -o yaml 2>&1 | head -10
-"$SAOLA" get operator -n "$NS" -o json 2>&1 | head -10
+"$SAOLA" get middleware -n "$NS" -o yaml 2>&1 | sed -n '1,10p'
+"$SAOLA" get operator -n "$NS" -o json 2>&1 | sed -n '1,10p'
 "$SAOLA" --lang en get all -n "$NS"
 
 # Phase D.5: Error scenarios
