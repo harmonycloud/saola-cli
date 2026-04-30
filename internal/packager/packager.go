@@ -133,10 +133,10 @@ func PackDir(dir string) (data []byte, meta *Metadata, err error) {
 		}
 
 		hdr := &tar.Header{
-			Name:    tarPath,
-			Size:    info.Size(),
-			Mode:    int64(info.Mode()),
-			ModTime: info.ModTime(),
+			Name:     tarPath,
+			Size:     info.Size(),
+			Mode:     int64(info.Mode()),
+			ModTime:  info.ModTime(),
 			Typeflag: tar.TypeReg,
 		}
 		if err = tw.WriteHeader(hdr); err != nil {

@@ -35,10 +35,10 @@ func TestResolve(t *testing.T) {
 		{"bl", "baseline"},
 		{"pkg", "package"},
 		{"middleware", "middleware"}, // passthrough — canonical name unchanged
-		{"operator", "operator"},    // passthrough
-		{"action", "action"},        // passthrough
-		{"foo", "foo"},              // unknown passthrough
-		{"", ""},                    // empty passthrough
+		{"operator", "operator"},     // passthrough
+		{"action", "action"},         // passthrough
+		{"foo", "foo"},               // unknown passthrough
+		{"", ""},                     // empty passthrough
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {

@@ -92,7 +92,7 @@ Use --wait to block until the resource is fully removed.`,
 			//
 			// dry-run 模式：打印将要删除的资源并直接返回。
 			if dryRun {
-				fmt.Fprintf(os.Stdout, "middleware/%s deleted (dry-run)\n", name)
+				_, _ = fmt.Fprintf(os.Stdout, "middleware/%s deleted (dry-run)\n", name)
 				return nil
 			}
 

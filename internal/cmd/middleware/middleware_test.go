@@ -95,7 +95,9 @@ spec:
   baseline: redis-7
 `
 	path := writeTempYAML(t, yaml)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	o := &CreateOptions{
 		Config: newCfg(""),
@@ -134,7 +136,9 @@ func TestMiddlewareCreate_FileNotFound(t *testing.T) {
 // 使用未闭合的括号，在 YAML 和 JSON 上下文中均无效。
 func TestMiddlewareCreate_InvalidYAML(t *testing.T) {
 	path := writeTempYAML(t, "key: [unclosed")
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	o := &CreateOptions{
 		Config: newCfg("default"),
@@ -167,7 +171,9 @@ spec:
   baseline: redis-7
 `
 	path := writeTempYAML(t, yaml)
-	defer os.Remove(path)
+	defer func() {
+		_ = os.Remove(path)
+	}()
 
 	o := &CreateOptions{
 		Config:    newCfg(""),

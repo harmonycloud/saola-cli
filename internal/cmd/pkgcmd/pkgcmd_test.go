@@ -23,10 +23,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/harmonycloud/saola-cli/internal/config"
-	"github.com/harmonycloud/saola-cli/internal/packager"
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
+	"github.com/harmonycloud/saola-cli/internal/config"
 	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
+	"github.com/harmonycloud/saola-cli/internal/packager"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -53,9 +53,9 @@ func NewCmdVersion(_ *config.Config) *cobra.Command {
 				p := &printer.YAMLPrinter{}
 				return p.Print(os.Stdout, info)
 			default:
-				fmt.Fprintln(os.Stdout, info.String())
+				_, err := fmt.Fprintln(os.Stdout, info.String())
+				return err
 			}
-			return nil
 		},
 	}
 

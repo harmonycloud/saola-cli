@@ -23,15 +23,15 @@ import (
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/harmonycloud/saola-cli/internal/client"
+	"github.com/harmonycloud/saola-cli/internal/config"
 	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
 	zeusk8s "github.com/harmonycloud/saola-cli/internal/k8s"
-	"github.com/harmonycloud/saola-cli/internal/packages"
-	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/packages"
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
-	// sigsyaml recognises json struct tags, which is required for
+	// sigsyaml recognizes json struct tags, which is required for
 	// correctly decoding Kubernetes ObjectMeta fields.
 	//
 	// sigsyaml 能识别 json struct tag，是正确解码 Kubernetes ObjectMeta 的必要条件。
@@ -154,7 +154,6 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 	return nil
 }
 
-
 // enrichOperator auto-completes the four labels that opensaola requires to
 // reconcile a MiddlewareOperator CR successfully.
 //
@@ -250,7 +249,7 @@ func (o *CreateOptions) enrichOperator(ctx context.Context, cli sigs.Client, mo 
 		return fmt.Errorf("get package secret %s: %w", matchedSecretName, err)
 	}
 
-	// Initialise Labels map if the manifest did not include any labels.
+	// Initialize Labels map if the manifest did not include any labels.
 	//
 	// 如果 manifest 未携带任何 label，初始化 Labels map。
 	if mo.Labels == nil {

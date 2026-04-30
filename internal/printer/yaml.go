@@ -30,6 +30,9 @@ type YAMLPrinter struct{}
 func (p *YAMLPrinter) Print(w io.Writer, data interface{}) error {
 	enc := yaml.NewEncoder(w)
 	enc.SetIndent(2)
-	defer enc.Close()
-	return enc.Encode(data)
+	if err := enc.Encode(data); err != nil {
+		_ = enc.Close()
+		return err
+	}
+	return enc.Close()
 }

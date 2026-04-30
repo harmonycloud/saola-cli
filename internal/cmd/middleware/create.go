@@ -23,11 +23,11 @@ import (
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/harmonycloud/saola-cli/internal/client"
+	"github.com/harmonycloud/saola-cli/internal/config"
 	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
 	zeusk8s "github.com/harmonycloud/saola-cli/internal/k8s"
-	"github.com/harmonycloud/saola-cli/internal/packages"
-	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
+	"github.com/harmonycloud/saola-cli/internal/packages"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 	sigsyaml "sigs.k8s.io/yaml"
@@ -88,7 +88,7 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 		return fmt.Errorf("read file %s: %w", o.File, err)
 	}
 
-	// 2. Deserialise into Middleware using sigs.k8s.io/yaml so that json struct tags
+	// 2. Deserialize into Middleware using sigs.k8s.io/yaml so that json struct tags
 	// (e.g. metadata.name) are respected, matching standard Kubernetes manifest format.
 	//
 	// 使用 sigs.k8s.io/yaml 反序列化，该库先转 JSON 再解析，
@@ -161,7 +161,6 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 
 	return nil
 }
-
 
 // enrichMiddleware auto-completes the labels and operatorBaseline fields that
 // opensaola requires to reconcile a Middleware CR successfully.
@@ -248,7 +247,7 @@ func (o *CreateOptions) enrichMiddleware(ctx context.Context, cli sigs.Client, m
 		return fmt.Errorf("get package secret %s: %w", matchedSecretName, err)
 	}
 
-	// Initialise Labels map if the manifest did not include any labels.
+	// Initialize Labels map if the manifest did not include any labels.
 	//
 	// 如果 manifest 未携带任何 label，初始化 Labels map。
 	if mw.Labels == nil {

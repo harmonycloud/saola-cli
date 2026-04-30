@@ -119,7 +119,7 @@ func TestWaitForInstall_Timeout(t *testing.T) {
 }
 
 // TestWaitForInstall_EventuallyEnabled verifies that WaitForInstall succeeds after a background
-// goroutine sets enabled=true on the Secret, simulating operator behaviour.
+// goroutine sets enabled=true on the Secret, simulating operator behavior.
 //
 // TestWaitForInstall_EventuallyEnabled 验证后台 goroutine 模拟 operator 将 enabled 改为 true 后，
 // WaitForInstall 最终成功返回。

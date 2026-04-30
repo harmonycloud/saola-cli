@@ -22,11 +22,11 @@ import (
 	"os"
 	"time"
 
+	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/harmonycloud/saola-cli/internal/client"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/harmonycloud/saola-cli/internal/waiter"
-	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

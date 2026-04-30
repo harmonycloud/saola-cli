@@ -32,7 +32,7 @@ import (
 	upgradecmd "github.com/harmonycloud/saola-cli/internal/cmd/upgrade"
 	versioncmd "github.com/harmonycloud/saola-cli/internal/cmd/version"
 
-"github.com/harmonycloud/saola-cli/internal/config"
+	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 )
@@ -84,7 +84,6 @@ func NewRootCmd() *cobra.Command {
 		inspectcmd.NewCmdInspect(cfg),
 		versioncmd.NewCmdVersion(cfg),
 	)
-
 
 	// Patch cobra's auto-generated English-only text to be bilingual.
 	//

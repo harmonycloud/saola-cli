@@ -55,12 +55,23 @@ func newConfig() *config.Config {
 //
 // TestActionRun_Success 验证 Run 能通过 fake client 成功创建 MiddlewareAction。
 func TestActionRun_Success(t *testing.T) {
-	cli := fake.NewClientBuilder().WithScheme(newScheme()).Build()
+	existingMiddleware := &zeusv1.Middleware{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-redis",
+			Namespace: "default",
+			Labels: map[string]string{
+				zeusv1.LabelPackageName:    "redis-1.0.0",
+				zeusv1.LabelPackageVersion: "1.0.0",
+				zeusv1.LabelComponent:      "Redis",
+			},
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(newScheme()).WithObjects(existingMiddleware).Build()
 
 	o := &RunOptions{
 		Config:     newConfig(),
 		Namespace:  "default",
-		Middleware:  "my-redis",
+		Middleware: "my-redis",
 		Baseline:   "redis-backup",
 		Client:     cli,
 	}
@@ -85,6 +96,28 @@ func TestActionRun_Success(t *testing.T) {
 	}
 	if item.Spec.Baseline != "redis-backup" {
 		t.Errorf("Baseline = %q, want %q", item.Spec.Baseline, "redis-backup")
+	}
+	if item.Labels[zeusv1.LabelPackageName] != "redis-1.0.0" {
+		t.Errorf("package label = %q, want redis-1.0.0", item.Labels[zeusv1.LabelPackageName])
+	}
+}
+
+// TestActionRun_MissingTargetMiddleware verifies that Run requires the target Middleware.
+//
+// TestActionRun_MissingTargetMiddleware 验证 Run 需要目标 Middleware 已存在。
+func TestActionRun_MissingTargetMiddleware(t *testing.T) {
+	cli := fake.NewClientBuilder().WithScheme(newScheme()).Build()
+
+	o := &RunOptions{
+		Config:     newConfig(),
+		Namespace:  "default",
+		Middleware: "missing-redis",
+		Baseline:   "redis-backup",
+		Client:     cli,
+	}
+
+	if err := o.Run(context.Background()); err == nil {
+		t.Fatal("expected missing Middleware error, got nil")
 	}
 }
 

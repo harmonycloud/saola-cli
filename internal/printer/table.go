@@ -37,9 +37,13 @@ import (
 //   - 任意 struct 切片     — 列为导出字段，值通过 fmt.Sprint 格式化
 type TablePrinter struct{}
 
-func (p *TablePrinter) Print(w io.Writer, data interface{}) error {
+func (p *TablePrinter) Print(w io.Writer, data interface{}) (err error) {
 	tw := tabwriter.NewWriter(w, 0, 0, 3, ' ', 0)
-	defer tw.Flush()
+	defer func() {
+		if flushErr := tw.Flush(); err == nil && flushErr != nil {
+			err = flushErr
+		}
+	}()
 
 	if data == nil {
 		return nil

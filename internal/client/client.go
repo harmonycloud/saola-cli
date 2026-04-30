@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// Client wraps a controller-runtime client with lazy initialisation.
-// Unlike sync.Once, failed initialisation is not cached — subsequent calls to
+// Client wraps a controller-runtime client with lazy initialization.
+// Unlike sync.Once, failed initialization is not cached — subsequent calls to
 // Get() will retry, which is useful when transient errors (e.g. network) occur.
 //
 // Client 封装了一个延迟初始化的 controller-runtime 客户端。
@@ -44,7 +44,7 @@ type Client struct {
 	inner client.Client
 }
 
-// New creates a lazily-initialised Client.
+// New creates a lazily-initialized Client.
 // The actual connection to the cluster is deferred until the first call to Get().
 //
 // 创建一个延迟初始化的 Client，实际集群连接在首次调用 Get() 时建立。
@@ -52,9 +52,9 @@ func New(cfg *config.Config) *Client {
 	return &Client{cfg: cfg}
 }
 
-// Get returns the underlying controller-runtime client, initialising it on first call.
-// If initialisation fails, the error is returned but not cached — a subsequent call
-// will attempt initialisation again.
+// Get returns the underlying controller-runtime client, initializing it on first call.
+// If initialization fails, the error is returned but not cached — a subsequent call
+// will attempt initialization again.
 //
 // 返回底层 controller-runtime 客户端，首次调用时完成初始化。
 // 如果初始化失败，返回错误但不缓存——后续调用会重新尝试初始化。

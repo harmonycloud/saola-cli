@@ -24,8 +24,8 @@ import (
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/harmonycloud/saola-cli/internal/client"
-	zeusk8s "github.com/harmonycloud/saola-cli/internal/k8s"
 	"github.com/harmonycloud/saola-cli/internal/config"
+	zeusk8s "github.com/harmonycloud/saola-cli/internal/k8s"
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"

@@ -27,14 +27,13 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/huh"
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	"github.com/harmonycloud/saola-cli/internal/client"
+	"github.com/harmonycloud/saola-cli/internal/config"
 	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
 	zeusk8s "github.com/harmonycloud/saola-cli/internal/k8s"
-	"github.com/harmonycloud/saola-cli/internal/packages"
-	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
-	"github.com/charmbracelet/huh"
+	"github.com/harmonycloud/saola-cli/internal/packages"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,7 +72,6 @@ type baselineEntry struct {
 	// Baseline 是完整的 MiddlewareBaseline 对象。
 	Baseline *zeusv1.MiddlewareBaseline
 }
-
 
 // operatorBaselineEntry holds summary information about a discovered MiddlewareOperatorBaseline
 // so we can present a selection list and later look up details.
@@ -370,7 +368,7 @@ func runInteractiveMiddleware(ctx context.Context, cfg *config.Config, cli sigs.
 		for _, s := range schemas {
 			s := s // capture for closure
 
-			// Initialise with the default value.
+			// Initialize with the default value.
 			//
 			// 用默认值初始化。
 			val := ""
@@ -500,7 +498,7 @@ func runInteractiveMiddleware(ctx context.Context, cfg *config.Config, cli sigs.
 						return nil
 					}))
 
-			default: // "string" and any other unrecognised types
+			default: // "string" and any other unrecognized types
 				fields = append(fields, huh.NewInput().
 					Title(title).
 					Value(&val).
@@ -566,10 +564,10 @@ func runInteractiveMiddleware(ctx context.Context, cfg *config.Config, cli sigs.
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				zeusv1.LabelPackageName:    selected.PackageSecretName,
-				zeusv1.LabelPackageVersion: selected.PackageVersion,
-				zeusv1.LabelComponent:      selected.Component,
-				saolaconsts.LabelDefinition:            selected.Name,
+				zeusv1.LabelPackageName:     selected.PackageSecretName,
+				zeusv1.LabelPackageVersion:  selected.PackageVersion,
+				zeusv1.LabelComponent:       selected.Component,
+				saolaconsts.LabelDefinition: selected.Name,
 			},
 		},
 		Spec: zeusv1.MiddlewareSpec{
@@ -602,7 +600,7 @@ func runInteractiveMiddleware(ctx context.Context, cfg *config.Config, cli sigs.
 	}
 
 	if !confirm {
-		fmt.Fprintln(os.Stdout, lang.T("已取消", "Cancelled"))
+		fmt.Fprintln(os.Stdout, lang.T("已取消", "Canceled"))
 		return nil
 	}
 
@@ -817,7 +815,7 @@ func runInteractiveOperator(ctx context.Context, cfg *config.Config, cli sigs.Cl
 		selected.Baseline.Spec.Globe != nil &&
 		len(selected.Baseline.Spec.Globe.Raw) > 0 {
 
-		// Deserialise the baseline globe into a flat string map.
+		// Deserialize the baseline globe into a flat string map.
 		//
 		// 将 baseline globe 反序列化为扁平字符串 map。
 		var baselineGlobeRaw map[string]interface{}
@@ -874,7 +872,7 @@ func runInteractiveOperator(ctx context.Context, cfg *config.Config, cli sigs.Cl
 		}
 
 		if changed {
-			// Rebuild the globe map using the user-provided values and serialise.
+			// Rebuild the globe map using the user-provided values and serialize.
 			//
 			// 用用户输入值重建 globe map 并序列化。
 			finalGlobe := make(map[string]interface{}, len(globeKeys))
@@ -910,10 +908,10 @@ func runInteractiveOperator(ctx context.Context, cfg *config.Config, cli sigs.Cl
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				zeusv1.LabelPackageName:    selected.PackageSecretName,
-				zeusv1.LabelPackageVersion: selected.PackageVersion,
-				zeusv1.LabelComponent:      selected.Component,
-				saolaconsts.LabelDefinition:            selected.Name,
+				zeusv1.LabelPackageName:     selected.PackageSecretName,
+				zeusv1.LabelPackageVersion:  selected.PackageVersion,
+				zeusv1.LabelComponent:       selected.Component,
+				saolaconsts.LabelDefinition: selected.Name,
 			},
 		},
 		Spec: zeusv1.MiddlewareOperatorSpec{
@@ -950,7 +948,7 @@ func runInteractiveOperator(ctx context.Context, cfg *config.Config, cli sigs.Cl
 	}
 
 	if !confirm {
-		fmt.Fprintln(os.Stdout, lang.T("已取消", "Cancelled"))
+		fmt.Fprintln(os.Stdout, lang.T("已取消", "Canceled"))
 		return nil
 	}
 
@@ -972,19 +970,6 @@ func runInteractiveOperator(ctx context.Context, cfg *config.Config, cli sigs.Cl
 
 	fmt.Fprintf(os.Stdout, "middlewareoperator/%s created\n", name)
 	return nil
-}
-
-// newInteractiveCli resolves the k8s client to use in RunInteractive.
-// If injected is non-nil it is returned as-is; otherwise a live client is built
-// from cfg.
-//
-// newInteractiveCli 解析 RunInteractive 中使用的 k8s 客户端。
-// 若 injected 非 nil 则直接返回；否则根据 cfg 创建真实客户端。
-func newInteractiveCli(cfg *config.Config, injected sigs.Client) (sigs.Client, error) {
-	if injected != nil {
-		return injected, nil
-	}
-	return client.New(cfg).Get()
 }
 
 // ----------------------------------------------------------------

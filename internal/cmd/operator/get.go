@@ -24,12 +24,12 @@ import (
 	"strings"
 	"time"
 
+	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/harmonycloud/saola-cli/internal/client"
 	"github.com/harmonycloud/saola-cli/internal/cmdutil"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/harmonycloud/saola-cli/internal/printer"
-	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -47,19 +47,6 @@ type GetOptions struct {
 	//
 	// Client 在测试中注入；nil 时使用 client.New(cfg) 创建。
 	Client sigs.Client
-}
-
-// operatorRow is a display-friendly row for table output.
-//
-// operatorRow 是用于表格输出的显示行结构。
-type operatorRow struct {
-	Name      string
-	Namespace string
-	Baseline  string
-	State     string
-	Ready     string
-	Runtime   string
-	Age       string
 }
 
 // NewCmdGet returns the operator get command.
@@ -282,4 +269,3 @@ func formatLabelsShort(labels map[string]string) string {
 	}
 	return strings.Join(parts, ",")
 }
-

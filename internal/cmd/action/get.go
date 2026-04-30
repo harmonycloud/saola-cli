@@ -23,12 +23,12 @@ import (
 	"text/tabwriter"
 	"time"
 
+	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/harmonycloud/saola-cli/internal/client"
 	"github.com/harmonycloud/saola-cli/internal/cmdutil"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/harmonycloud/saola-cli/internal/printer"
-	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -178,4 +178,3 @@ func printActionTable(actions []*zeusv1.MiddlewareAction, showNamespace bool) er
 	}
 	return nil
 }
-

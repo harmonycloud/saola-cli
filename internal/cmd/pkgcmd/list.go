@@ -24,8 +24,8 @@ import (
 	"github.com/harmonycloud/saola-cli/internal/client"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
-	"github.com/harmonycloud/saola-cli/internal/printer"
 	"github.com/harmonycloud/saola-cli/internal/packages"
+	"github.com/harmonycloud/saola-cli/internal/printer"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -52,7 +52,7 @@ func NewCmdList(cfg *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short: lang.T("列出已安装的中间件包", "List installed middleware packages"),
+		Short:   lang.T("列出已安装的中间件包", "List installed middleware packages"),
 		Long: lang.T(
 			`列出 pkg-namespace 中所有已安装的中间件包 Secret，支持按组件名和版本过滤。`,
 			`List all installed middleware package Secrets in the pkg-namespace. Supports filtering by component name and version.`,

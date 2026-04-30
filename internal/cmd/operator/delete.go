@@ -143,7 +143,7 @@ func (o *DeleteOptions) Run(ctx context.Context) error {
 	return nil
 }
 
-// waitForDeletion polls until the MiddlewareOperator no longer exists or the context is cancelled.
+// waitForDeletion polls until the MiddlewareOperator no longer exists or the context is canceled.
 //
 // waitForDeletion 轮询直到 MiddlewareOperator 不再存在，或 context 被取消。
 func waitForDeletion(ctx context.Context, cli sigs.Client, name, namespace string) error {

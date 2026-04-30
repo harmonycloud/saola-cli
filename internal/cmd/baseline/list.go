@@ -25,8 +25,8 @@ import (
 	"github.com/harmonycloud/saola-cli/internal/client"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
-	"github.com/harmonycloud/saola-cli/internal/printer"
 	"github.com/harmonycloud/saola-cli/internal/packages"
+	"github.com/harmonycloud/saola-cli/internal/printer"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -53,7 +53,7 @@ func NewCmdList(cfg *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short: lang.T("列出已安装包中的 baseline", "List baselines in an installed package"),
+		Short:   lang.T("列出已安装包中的 baseline", "List baselines in an installed package"),
 		Long: lang.T(
 			`列出指定已安装包中所有 MiddlewareBaseline 或 MiddlewareOperatorBaseline。
 使用 --kind 指定 baseline 类型（middleware 或 operator）。`,
@@ -140,10 +140,10 @@ func (o *ListOptions) Run(ctx context.Context) error {
 //
 // baselineRow 是 baseline 表格显示的行结构。
 type baselineRow struct {
-	NAME            string
-	OPERATOR        string
-	CONFIGURATIONS  int
-	PREACTIONS      int
+	NAME           string
+	OPERATOR       string
+	CONFIGURATIONS int
+	PREACTIONS     int
 }
 
 // toMwBaselineRows converts MiddlewareBaseline list to table rows.

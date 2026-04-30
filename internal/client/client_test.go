@@ -36,7 +36,7 @@ func TestClient_InvalidKubeconfig(t *testing.T) {
 	}
 }
 
-// TestClient_RetryAfterFailure verifies that a failed initialisation is not
+// TestClient_RetryAfterFailure verifies that a failed initialization is not
 // cached — a second call to Get retries instead of returning a stale error.
 //
 // 验证初始化失败不会被缓存——第二次调用 Get 会重新尝试而不是返回缓存的错误。
@@ -63,6 +63,6 @@ func TestClient_RetryAfterFailure(t *testing.T) {
 	//
 	// 关键测试：inner 必须仍为 nil，证明没有缓存失败的客户端。
 	if c.inner != nil {
-		t.Fatal("inner client should remain nil after failed initialisations")
+		t.Fatal("inner client should remain nil after failed initializations")
 	}
 }

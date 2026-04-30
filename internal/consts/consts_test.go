@@ -20,7 +20,7 @@ import "testing"
 
 // TestConstantValues verifies that critical constant values remain stable
 // across refactoring. These values are used in Kubernetes labels and Secret
-// data keys; any accidental change would break runtime behaviour.
+// data keys; any accidental change would break runtime behavior.
 //
 // 验证关键常量值在重构过程中保持稳定。这些值用于 Kubernetes labels 和
 // Secret data keys，任何意外变更都会导致运行时行为异常。

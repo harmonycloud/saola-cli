@@ -105,7 +105,9 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		_ = w.Flush()
+	}()
 
 	// --- Metadata ---
 	//
@@ -217,4 +219,3 @@ func formatAnnotations(annotations map[string]string) string {
 	}
 	return strings.Join(parts, ",")
 }
-

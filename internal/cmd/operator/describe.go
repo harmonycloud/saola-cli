@@ -23,11 +23,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/harmonycloud/saola-cli/internal/client"
 	"github.com/harmonycloud/saola-cli/internal/cmdutil"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
-	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/spf13/cobra"
 	appsv1 "k8s.io/api/apps/v1"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
@@ -60,7 +60,7 @@ func NewCmdDescribe(cfg *config.Config) *cobra.Command {
 			`Print the full spec, status, conditions, and per-operator deployment status of a MiddlewareOperator.`,
 		),
 		Example: `  saola operator describe redis-operator -n my-ns`,
-		Args:  cobra.ExactArgs(1),
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Name = args[0]
 			return o.Run(cmd.Context())
@@ -113,7 +113,9 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 // printDescribe 格式化输出 describe 信息。
 func printDescribe(w *os.File, mo *zeusv1.MiddlewareOperator) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	defer tw.Flush()
+	defer func() {
+		_ = tw.Flush()
+	}()
 
 	// Basic metadata section.
 	//
@@ -222,5 +224,3 @@ func formatLabels(m map[string]string) string {
 	}
 	return strings.Join(parts, ", ")
 }
-
-

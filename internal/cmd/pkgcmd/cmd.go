@@ -29,7 +29,7 @@ func NewCmdPackage(cfg *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "package",
 		Aliases: []string{"pkg"},
-		Short: lang.T("管理中间件包", "Manage middleware packages"),
+		Short:   lang.T("管理中间件包", "Manage middleware packages"),
 		Long: lang.T(
 			`安装、卸载、升级、列出、检查并构建中间件包。`,
 			`Install, uninstall, upgrade, list, inspect and build middleware packages.`,

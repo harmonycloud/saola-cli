@@ -27,7 +27,7 @@ import (
 )
 
 // NamePrinter outputs resources in "type/name" format, one per line.
-// It mirrors the behaviour of `kubectl get -o name`.
+// It mirrors the behavior of `kubectl get -o name`.
 //
 // NamePrinter 以 "type/name" 格式输出资源，每行一条。
 // 与 `kubectl get -o name` 的行为保持一致。
@@ -77,9 +77,13 @@ func (p *NamePrinter) Print(w io.Writer, data interface{}) error {
 			return err
 		}
 		if p.ResourceType != "" {
-			fmt.Fprintf(w, "%s/%s\n", p.ResourceType, name)
+			if _, err := fmt.Fprintf(w, "%s/%s\n", p.ResourceType, name); err != nil {
+				return err
+			}
 		} else {
-			fmt.Fprintf(w, "%s\n", name)
+			if _, err := fmt.Fprintf(w, "%s\n", name); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -67,7 +67,9 @@ func writeTempYAML(t *testing.T, content string) string {
 	if err != nil {
 		t.Fatalf("create temp file: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 	if _, err := f.WriteString(content); err != nil {
 		t.Fatalf("write temp file: %v", err)
 	}
@@ -115,7 +117,9 @@ spec:
 func TestOperatorCreate_Success(t *testing.T) {
 	yamlContent := moYAML("redis-operator", "")
 	file := writeTempYAML(t, yamlContent)
-	defer os.Remove(file)
+	defer func() {
+		_ = os.Remove(file)
+	}()
 
 	fc := newFakeClient()
 	o := &CreateOptions{
@@ -148,7 +152,9 @@ func TestOperatorCreate_AlreadyExists(t *testing.T) {
 	}
 	yamlContent := moYAML("redis-operator", "")
 	file := writeTempYAML(t, yamlContent)
-	defer os.Remove(file)
+	defer func() {
+		_ = os.Remove(file)
+	}()
 
 	o := &CreateOptions{
 		Config:    emptyCfg(),
@@ -195,7 +201,9 @@ func TestOperatorCreate_MissingNamespace(t *testing.T) {
 	// 无 namespace 字段的 YAML。
 	yaml := moYAML("redis-operator", "")
 	file := writeTempYAML(t, yaml)
-	defer os.Remove(file)
+	defer func() {
+		_ = os.Remove(file)
+	}()
 
 	o := &CreateOptions{
 		Config: emptyCfg(), // Namespace is ""
@@ -238,7 +246,7 @@ func TestOperatorDelete_Success(t *testing.T) {
 }
 
 // TestOperatorDelete_NotFound verifies that deleting a non-existent object
-// prints a message and returns nil (idempotent behaviour).
+// prints a message and returns nil (idempotent behavior).
 //
 // 验证删除不存在的对象时静默打印并返回 nil（幂等行为）。
 func TestOperatorDelete_NotFound(t *testing.T) {

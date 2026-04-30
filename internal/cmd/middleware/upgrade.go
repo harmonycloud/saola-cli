@@ -24,8 +24,8 @@ import (
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/harmonycloud/saola-cli/internal/client"
-	zeusk8s "github.com/harmonycloud/saola-cli/internal/k8s"
 	"github.com/harmonycloud/saola-cli/internal/config"
+	zeusk8s "github.com/harmonycloud/saola-cli/internal/k8s"
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
@@ -113,7 +113,7 @@ func (o *UpgradeOptions) Run(ctx context.Context) error {
 		ns = "default"
 	}
 
-	// 2. Initialise k8s client.
+	// 2. Initialize k8s client.
 	//
 	// 初始化 k8s client。
 	cli := o.Client
@@ -197,7 +197,7 @@ func (o *UpgradeOptions) Run(ctx context.Context) error {
 //   - the middleware.cn/update annotation is gone, AND
 //   - status.state == Available
 //
-// It returns an error when ctx is cancelled/timed out, embedding last-known state/reason.
+// It returns an error when ctx is canceled/timed out, embedding last-known state/reason.
 //
 // waitForUpgrade 每 3 秒轮询一次，直到以下条件同时满足：
 //   - middleware.cn/update annotation 不再存在

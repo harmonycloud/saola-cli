@@ -31,9 +31,9 @@ import (
 	"time"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
-	"github.com/harmonycloud/saola-cli/internal/tarutil"
 	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
 	k8shelper "github.com/harmonycloud/saola-cli/internal/k8s"
+	"github.com/harmonycloud/saola-cli/internal/tarutil"
 	"github.com/klauspost/compress/zstd"
 	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -299,10 +299,12 @@ func Compress(data []byte) ([]byte, int, error) {
 	}
 	num, err := w.Write(data)
 	if err != nil {
-		w.Close()
+		_ = w.Close()
 		return nil, 0, err
 	}
-	w.Close()
+	if err := w.Close(); err != nil {
+		return nil, 0, err
+	}
 	return buf.Bytes(), num, nil
 }
 

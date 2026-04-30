@@ -23,7 +23,7 @@ import (
 
 // helpers ----------------------------------------------------------------
 
-// mustMarshal serialises v to a JSON string or panics.
+// mustMarshal serializes v to a JSON string or panics.
 //
 // mustMarshal 将 v 序列化为 JSON 字符串，失败时 panic。
 func mustMarshal(v interface{}) string {
@@ -267,8 +267,8 @@ func TestParseNecessarySchema_Password(t *testing.T) {
 // TestParseNecessarySchema_SortedOutput 验证返回切片按 Path 字母顺序排序。
 func TestParseNecessarySchema_SortedOutput(t *testing.T) {
 	raw := map[string]interface{}{
-		"zoo": mustMarshal(map[string]interface{}{"type": "string", "label": "Z"}),
-		"alpha": mustMarshal(map[string]interface{}{"type": "string", "label": "A"}),
+		"zoo":    mustMarshal(map[string]interface{}{"type": "string", "label": "Z"}),
+		"alpha":  mustMarshal(map[string]interface{}{"type": "string", "label": "A"}),
 		"middle": mustMarshal(map[string]interface{}{"type": "string", "label": "M"}),
 	}
 

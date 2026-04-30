@@ -128,6 +128,16 @@ func (o *RunOptions) Run(ctx context.Context) error {
 		}
 	}
 
+	middleware := &zeusv1.Middleware{}
+	if err = cli.Get(ctx, sigs.ObjectKey{Name: o.Middleware, Namespace: ns}, middleware); err != nil {
+		return fmt.Errorf("get Middleware %s/%s: %w", ns, o.Middleware, err)
+	}
+	labels := make(map[string]string, len(middleware.Labels))
+	for key, value := range middleware.Labels {
+		labels[key] = value
+	}
+	action.Labels = labels
+
 	if err = cli.Create(ctx, action); err != nil {
 		return fmt.Errorf("create MiddlewareAction: %w", err)
 	}

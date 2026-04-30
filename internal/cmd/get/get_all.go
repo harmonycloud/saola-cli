@@ -58,7 +58,7 @@ A section header is printed before each resource type, even when the list is emp
 			// --- Middlewares ---
 			//
 			// --- Middleware 资源 ---
-			fmt.Fprintln(os.Stdout, "=== Middlewares ===")
+			_, _ = fmt.Fprintln(os.Stdout, "=== Middlewares ===")
 			mwOpts := &middleware.GetOptions{
 				Config:        cfg,
 				Namespace:     namespace,
@@ -70,12 +70,12 @@ A section header is printed before each resource type, even when the list is emp
 				errs = append(errs, err)
 			}
 
-			fmt.Fprintln(os.Stdout, "")
+			_, _ = fmt.Fprintln(os.Stdout, "")
 
 			// --- Operators ---
 			//
 			// --- Operator 资源 ---
-			fmt.Fprintln(os.Stdout, "=== Operators ===")
+			_, _ = fmt.Fprintln(os.Stdout, "=== Operators ===")
 			opOpts := &operator.GetOptions{
 				Config:        cfg,
 				Namespace:     namespace,
@@ -83,16 +83,16 @@ A section header is printed before each resource type, even when the list is emp
 				Output:        output,
 			}
 			if err := opOpts.Run(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "error listing operators: %v\n", err)
+				_, _ = fmt.Fprintf(os.Stderr, "error listing operators: %v\n", err)
 				errs = append(errs, err)
 			}
 
-			fmt.Fprintln(os.Stdout, "")
+			_, _ = fmt.Fprintln(os.Stdout, "")
 
 			// --- Actions ---
 			//
 			// --- Action 资源 ---
-			fmt.Fprintln(os.Stdout, "=== Actions ===")
+			_, _ = fmt.Fprintln(os.Stdout, "=== Actions ===")
 			actOpts := &action.GetOptions{
 				Config:        cfg,
 				Namespace:     namespace,
@@ -100,7 +100,7 @@ A section header is printed before each resource type, even when the list is emp
 				Output:        output,
 			}
 			if err := actOpts.Run(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "error listing actions: %v\n", err)
+				_, _ = fmt.Fprintf(os.Stderr, "error listing actions: %v\n", err)
 				errs = append(errs, err)
 			}
 
