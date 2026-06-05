@@ -18,7 +18,15 @@ package packages
 
 import (
 	"bytes"
+	"context"
 	"testing"
+
+	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
+	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 // TestCompressDecompress_Roundtrip verifies that compressing and then
@@ -99,6 +107,64 @@ func TestSetDataNamespace(t *testing.T) {
 	SetDataNamespace(old)
 	if DataNamespace != old {
 		t.Errorf("expected DataNamespace restored to %q, got %q", old, DataNamespace)
+	}
+}
+
+// TestList_UsesSecretMetadataWithoutDecompressing verifies that List stays
+// lightweight and does not read/decompress package payloads.
+//
+// TestList_UsesSecretMetadataWithoutDecompressing 验证 List 只读取 Secret
+// 元数据，不解压包内容。
+func TestList_UsesSecretMetadataWithoutDecompressing(t *testing.T) {
+	// NOT parallel — modifies global DataNamespace.
+	old := DataNamespace
+	SetDataNamespace("test-ns")
+	defer SetDataNamespace(old)
+
+	scheme := runtime.NewScheme()
+	if err := corev1.AddToScheme(scheme); err != nil {
+		t.Fatalf("add corev1 to scheme: %v", err)
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-v1",
+			Namespace: "test-ns",
+			Labels: map[string]string{
+				zeusv1.LabelProject:        saolaconsts.ProjectOpenSaola,
+				zeusv1.LabelComponent:      "redis",
+				zeusv1.LabelPackageVersion: "1.0.0",
+				zeusv1.LabelEnabled:        "true",
+			},
+		},
+		Data: map[string][]byte{
+			Release: []byte("not a compressed package"),
+		},
+	}
+	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build()
+
+	pkgs, err := List(context.Background(), cli, Option{})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(pkgs) != 1 {
+		t.Fatalf("expected 1 package, got %d", len(pkgs))
+	}
+	pkg := pkgs[0]
+	if pkg.Name != "redis-v1" {
+		t.Errorf("expected package name redis-v1, got %q", pkg.Name)
+	}
+	if pkg.Component != "redis" {
+		t.Errorf("expected component redis, got %q", pkg.Component)
+	}
+	if pkg.Metadata == nil || pkg.Metadata.Name != "redis" || pkg.Metadata.Version != "1.0.0" {
+		t.Fatalf("unexpected metadata: %#v", pkg.Metadata)
+	}
+	if !pkg.Enabled {
+		t.Error("expected package to be enabled")
+	}
+	if len(pkg.Files) != 0 {
+		t.Errorf("expected List to avoid loading files, got %d files", len(pkg.Files))
 	}
 }
 

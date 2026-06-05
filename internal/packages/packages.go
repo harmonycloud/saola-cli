@@ -127,13 +127,9 @@ func List(ctx context.Context, cli client.Client, opt Option) ([]*Package, error
 		return nil, err
 	}
 
-	var pkgs []*Package
-	for _, item := range secrets.Items {
-		pkg, pErr := Get(ctx, cli, item.Name)
-		if pErr != nil {
-			return nil, pErr
-		}
-		pkgs = append(pkgs, pkg)
+	pkgs := make([]*Package, 0, len(secrets.Items))
+	for idx := range secrets.Items {
+		pkgs = append(pkgs, packageFromSecretMetadata(&secrets.Items[idx]))
 	}
 	return pkgs, nil
 }
@@ -340,12 +336,23 @@ func parseSecret(s *corev1.Secret) (*Package, error) {
 		return nil, fmt.Errorf("unmarshal metadata failed: %w", err)
 	}
 
+	return packageFromSecret(s, info.Files, &metadata), nil
+}
+
+func packageFromSecretMetadata(s *corev1.Secret) *Package {
+	return packageFromSecret(s, map[string][]byte{}, &Metadata{
+		Name:    s.Labels[zeusv1.LabelComponent],
+		Version: s.Labels[zeusv1.LabelPackageVersion],
+	})
+}
+
+func packageFromSecret(s *corev1.Secret, files map[string][]byte, metadata *Metadata) *Package {
 	return &Package{
 		Name:      s.Name,
 		Created:   s.CreationTimestamp.Format(time.DateTime),
-		Files:     info.Files,
+		Files:     files,
 		Component: s.Labels[zeusv1.LabelComponent],
-		Metadata:  &metadata,
+		Metadata:  metadata,
 		Enabled:   s.Labels[zeusv1.LabelEnabled] == "true",
-	}, nil
+	}
 }
