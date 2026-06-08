@@ -18,6 +18,7 @@ package pkgcmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -42,6 +44,7 @@ func newScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
 	_ = corev1.AddToScheme(s)
 	_ = appsv1.AddToScheme(s)
+	_ = metav1.AddMetaToScheme(s)
 	_ = zeusv1.AddToScheme(s)
 	return s
 }
@@ -58,6 +61,10 @@ func newFakeClient(objs ...runtime.Object) sigs.Client {
 		}
 	}
 	return fake.NewClientBuilder().WithScheme(scheme).WithObjects(clientObjs...).Build()
+}
+
+func newMetadataClient(objs ...*metav1.PartialObjectMetadata) sigs.Client {
+	return &metadataClient{objects: objs}
 }
 
 // makePkgDir creates a minimal valid package directory for tests.
@@ -95,6 +102,60 @@ func buildPackedSecret(t *testing.T, dir, ns string) *corev1.Secret {
 	}
 	secret := packager.BuildInstallSecret("", ns, meta, data)
 	return secret
+}
+
+func metadataForSecret(secret *corev1.Secret) *metav1.PartialObjectMetadata {
+	obj := &metav1.PartialObjectMetadata{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              secret.Name,
+			Namespace:         secret.Namespace,
+			Labels:            secret.Labels,
+			Annotations:       secret.Annotations,
+			CreationTimestamp: secret.CreationTimestamp,
+		},
+	}
+	obj.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	return obj
+}
+
+type metadataClient struct {
+	sigs.Client
+	objects []*metav1.PartialObjectMetadata
+}
+
+func (c *metadataClient) Get(_ context.Context, key sigs.ObjectKey, obj sigs.Object, _ ...sigs.GetOption) error {
+	target, ok := obj.(*metav1.PartialObjectMetadata)
+	if !ok {
+		return fmt.Errorf("unexpected get object type %T", obj)
+	}
+	for _, item := range c.objects {
+		if item.Name == key.Name && item.Namespace == key.Namespace {
+			*target = *item.DeepCopy()
+			return nil
+		}
+	}
+	return fmt.Errorf("metadata object %s/%s not found", key.Namespace, key.Name)
+}
+
+func (c *metadataClient) List(_ context.Context, list sigs.ObjectList, opts ...sigs.ListOption) error {
+	target, ok := list.(*metav1.PartialObjectMetadataList)
+	if !ok {
+		return fmt.Errorf("unexpected list object type %T", list)
+	}
+	listOpts := &sigs.ListOptions{}
+	for _, opt := range opts {
+		opt.ApplyToList(listOpts)
+	}
+	for _, item := range c.objects {
+		if listOpts.Namespace != "" && item.Namespace != listOpts.Namespace {
+			continue
+		}
+		if listOpts.LabelSelector != nil && !listOpts.LabelSelector.Matches(labels.Set(item.Labels)) {
+			continue
+		}
+		target.Items = append(target.Items, *item.DeepCopy())
+	}
+	return nil
 }
 
 // ─────────────────────────────────────────────
@@ -446,7 +507,7 @@ func TestList_WithPackage(t *testing.T) {
 	dir := makePkgDir(t)
 	secret := buildPackedSecret(t, dir, ns)
 
-	cli := newFakeClient(secret)
+	cli := newMetadataClient(metadataForSecret(secret))
 	o := &ListOptions{
 		Config: &config.Config{PkgNamespace: ns},
 		Output: "table",
@@ -465,12 +526,32 @@ func TestList_FilterByComponent(t *testing.T) {
 	dir := makePkgDir(t)
 	secret := buildPackedSecret(t, dir, ns)
 
-	cli := newFakeClient(secret)
+	cli := newMetadataClient(metadataForSecret(secret))
 	o := &ListOptions{
 		Config:    &config.Config{PkgNamespace: ns},
 		Output:    "table",
 		Component: "testpkg",
 		Client:    cli,
+	}
+	if err := o.Run(context.Background()); err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+}
+
+// TestGet_WithPackage verifies that lightweight get reads package metadata.
+//
+// TestGet_WithPackage 验证轻量 get 可以读取包元数据。
+func TestGet_WithPackage(t *testing.T) {
+	ns := "test-ns"
+	dir := makePkgDir(t)
+	secret := buildPackedSecret(t, dir, ns)
+
+	cli := newMetadataClient(metadataForSecret(secret))
+	o := &GetOptions{
+		Config: &config.Config{PkgNamespace: ns},
+		Name:   secret.Name,
+		Output: "table",
+		Client: cli,
 	}
 	if err := o.Run(context.Background()); err != nil {
 		t.Fatalf("expected nil error, got: %v", err)

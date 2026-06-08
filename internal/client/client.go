@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -80,6 +81,9 @@ func (c *Client) Get() (client.Client, error) {
 	}
 	if err = storagev1.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("add storage/v1 scheme: %w", err)
+	}
+	if err = metav1.AddMetaToScheme(scheme); err != nil {
+		return nil, fmt.Errorf("add meta scheme: %w", err)
 	}
 	if err = zeusv1.AddToScheme(scheme); err != nil {
 		return nil, fmt.Errorf("add zeus/v1 scheme: %w", err)

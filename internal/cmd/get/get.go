@@ -261,11 +261,11 @@ Use --kind to specify the baseline type (middleware or operator).`,
 }
 
 // newGetPackage returns the "get package" sub-command.
-// When a name argument is provided it delegates to pkgcmd.InspectOptions;
+// When a name argument is provided it delegates to pkgcmd.GetOptions;
 // otherwise it delegates to pkgcmd.ListOptions.
 //
 // newGetPackage 返回 "get package" 子命令。
-// 有 name 参数时使用 pkgcmd.InspectOptions；无 name 参数时使用 pkgcmd.ListOptions。
+// 有 name 参数时使用 pkgcmd.GetOptions；无 name 参数时使用 pkgcmd.ListOptions。
 func newGetPackage(cfg *config.Config) *cobra.Command {
 	var (
 		component string
@@ -276,26 +276,27 @@ func newGetPackage(cfg *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "package [name]",
 		Aliases: []string{"pkg"},
-		Short:   lang.T("列出或查看已安装的中间件包", "List or inspect installed middleware packages"),
+		Short:   lang.T("列出或查看已安装中间件包元信息", "List or show installed middleware package metadata"),
 		Long: lang.T(
-			`列出 pkg-namespace 中所有已安装的中间件包，或查看指定包的详细内容。
-提供 name 参数时查看单个包的内容（inspect）；否则列出所有包（list）。
-支持按组件名和版本过滤。`,
-			`List all installed middleware packages in the pkg-namespace, or inspect a specific package.
-When a name argument is provided, the package contents are inspected; otherwise all packages are listed.
-Supports filtering by component name and version.`,
+			`列出 pkg-namespace 中所有已安装的中间件包，或查看指定包的元信息。
+提供 name 参数时只读取单个包的 Secret 元数据；否则列出所有包。
+如需解包查看文件内容，请使用 saola package inspect <name>。支持按组件名和版本过滤。`,
+			`List all installed middleware packages in the pkg-namespace, or show metadata for a specific package.
+When a name argument is provided, only Secret metadata is read; otherwise all packages are listed.
+Use saola package inspect <name> to unpack and inspect package contents. Supports filtering by component name and version.`,
 		),
 		Example: `  saola get package
   saola get pkg
   saola get package --component redis
   saola get package redis-v1
-  saola get package redis-v1 -o yaml`,
+  saola get package redis-v1 -o yaml
+  saola package inspect redis-v1`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				// Inspect a single package.
+				// Get metadata for a single package.
 				//
-				// 查看单个包的内容。
-				o := &pkgcmd.InspectOptions{
+				// 查看单个包的元数据。
+				o := &pkgcmd.GetOptions{
 					Config: cfg,
 					Name:   args[0],
 					Output: output,

@@ -37,6 +37,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	corev1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -122,7 +123,7 @@ func List(ctx context.Context, cli client.Client, opt Option) ([]*Package, error
 	if opt.LabelPackageVersion != "" {
 		lbs[zeusv1.LabelPackageVersion] = opt.LabelPackageVersion
 	}
-	secrets, err := k8shelper.GetSecrets(ctx, cli, DataNamespace, lbs)
+	secrets, err := k8shelper.GetSecretMetadatas(ctx, cli, DataNamespace, lbs)
 	if err != nil {
 		return nil, err
 	}
@@ -132,6 +133,17 @@ func List(ctx context.Context, cli client.Client, opt Option) ([]*Package, error
 		pkgs = append(pkgs, packageFromSecretMetadata(&secrets.Items[idx]))
 	}
 	return pkgs, nil
+}
+
+// GetSummary retrieves only package Secret metadata by name.
+//
+// GetSummary 根据名称仅获取包 Secret 的元数据。
+func GetSummary(ctx context.Context, cli client.Client, name string) (*Package, error) {
+	s, err := k8shelper.GetSecretMetadata(ctx, cli, name, DataNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("get secret metadata failed: %w", err)
+	}
+	return packageFromSecretMetadata(s), nil
 }
 
 // Get retrieves and parses a single package Secret by name.
@@ -339,20 +351,25 @@ func parseSecret(s *corev1.Secret) (*Package, error) {
 	return packageFromSecret(s, info.Files, &metadata), nil
 }
 
-func packageFromSecretMetadata(s *corev1.Secret) *Package {
-	return packageFromSecret(s, map[string][]byte{}, &Metadata{
-		Name:    s.Labels[zeusv1.LabelComponent],
-		Version: s.Labels[zeusv1.LabelPackageVersion],
+func packageFromSecretMetadata(s metav1.Object) *Package {
+	return packageFromObjectMetadata(s, map[string][]byte{}, &Metadata{
+		Name:    s.GetLabels()[zeusv1.LabelComponent],
+		Version: s.GetLabels()[zeusv1.LabelPackageVersion],
 	})
 }
 
 func packageFromSecret(s *corev1.Secret, files map[string][]byte, metadata *Metadata) *Package {
+	return packageFromObjectMetadata(s, files, metadata)
+}
+
+func packageFromObjectMetadata(s metav1.Object, files map[string][]byte, metadata *Metadata) *Package {
+	labels := s.GetLabels()
 	return &Package{
-		Name:      s.Name,
-		Created:   s.CreationTimestamp.Format(time.DateTime),
+		Name:      s.GetName(),
+		Created:   s.GetCreationTimestamp().Format(time.DateTime),
 		Files:     files,
-		Component: s.Labels[zeusv1.LabelComponent],
+		Component: labels[zeusv1.LabelComponent],
 		Metadata:  metadata,
-		Enabled:   s.Labels[zeusv1.LabelEnabled] == "true",
+		Enabled:   labels[zeusv1.LabelEnabled] == "true",
 	}
 }

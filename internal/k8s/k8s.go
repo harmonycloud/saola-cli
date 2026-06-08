@@ -30,6 +30,7 @@ import (
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -145,6 +146,21 @@ func GetSecret(ctx context.Context, cli client.Client, name, namespace string) (
 	return s, nil
 }
 
+// GetSecretMetadata retrieves only Secret metadata by name and namespace.
+//
+// 根据 name 和 namespace 仅获取单个 Secret 的元数据。
+func GetSecretMetadata(ctx context.Context, cli client.Client, name, namespace string) (*metav1.PartialObjectMetadata, error) {
+	if cli == nil {
+		return nil, fmt.Errorf("k8s client is nil")
+	}
+	s := new(metav1.PartialObjectMetadata)
+	s.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	if err := cli.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, s); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
 // GetSecrets lists Secrets in the given namespace matching labels.
 //
 // 列出指定命名空间下符合 label 筛选条件的 Secret 列表。
@@ -155,6 +171,21 @@ func GetSecrets(ctx context.Context, cli client.Client, namespace string, labelS
 	list := new(corev1.SecretList)
 	if err := cli.List(ctx, list, client.InNamespace(namespace), labelSelector); err != nil {
 		return nil, fmt.Errorf("list secrets: %w", err)
+	}
+	return list, nil
+}
+
+// GetSecretMetadatas lists only Secret metadata in the given namespace matching labels.
+//
+// 列出指定命名空间下符合 label 筛选条件的 Secret 元数据列表。
+func GetSecretMetadatas(ctx context.Context, cli client.Client, namespace string, labelSelector client.MatchingLabels) (*metav1.PartialObjectMetadataList, error) {
+	if cli == nil {
+		return nil, fmt.Errorf("k8s client is nil")
+	}
+	list := new(metav1.PartialObjectMetadataList)
+	list.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("SecretList"))
+	if err := cli.List(ctx, list, client.InNamespace(namespace), labelSelector); err != nil {
+		return nil, fmt.Errorf("list secret metadata: %w", err)
 	}
 	return list, nil
 }

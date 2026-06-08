@@ -19,14 +19,15 @@ package packages
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	saolaconsts "github.com/harmonycloud/saola-cli/internal/consts"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"k8s.io/apimachinery/pkg/labels"
+	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // TestCompressDecompress_Roundtrip verifies that compressing and then
@@ -121,27 +122,13 @@ func TestList_UsesSecretMetadataWithoutDecompressing(t *testing.T) {
 	SetDataNamespace("test-ns")
 	defer SetDataNamespace(old)
 
-	scheme := runtime.NewScheme()
-	if err := corev1.AddToScheme(scheme); err != nil {
-		t.Fatalf("add corev1 to scheme: %v", err)
-	}
-
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "redis-v1",
-			Namespace: "test-ns",
-			Labels: map[string]string{
-				zeusv1.LabelProject:        saolaconsts.ProjectOpenSaola,
-				zeusv1.LabelComponent:      "redis",
-				zeusv1.LabelPackageVersion: "1.0.0",
-				zeusv1.LabelEnabled:        "true",
-			},
-		},
-		Data: map[string][]byte{
-			Release: []byte("not a compressed package"),
-		},
-	}
-	cli := fake.NewClientBuilder().WithScheme(scheme).WithObjects(secret).Build()
+	secret := packageMetadataObject("redis-v1", "test-ns", map[string]string{
+		zeusv1.LabelProject:        saolaconsts.ProjectOpenSaola,
+		zeusv1.LabelComponent:      "redis",
+		zeusv1.LabelPackageVersion: "1.0.0",
+		zeusv1.LabelEnabled:        "true",
+	})
+	cli := &metadataClient{objects: []*metav1.PartialObjectMetadata{secret}}
 
 	pkgs, err := List(context.Background(), cli, Option{})
 	if err != nil {
@@ -166,6 +153,98 @@ func TestList_UsesSecretMetadataWithoutDecompressing(t *testing.T) {
 	if len(pkg.Files) != 0 {
 		t.Errorf("expected List to avoid loading files, got %d files", len(pkg.Files))
 	}
+}
+
+// TestGetSummary_UsesSecretMetadataWithoutDecompressing verifies that GetSummary
+// retrieves package metadata without reading/decompressing the package payload.
+//
+// TestGetSummary_UsesSecretMetadataWithoutDecompressing 验证 GetSummary 只读取
+// Secret 元数据，不读取/解压包内容。
+func TestGetSummary_UsesSecretMetadataWithoutDecompressing(t *testing.T) {
+	// NOT parallel — modifies global DataNamespace.
+	old := DataNamespace
+	SetDataNamespace("test-ns")
+	defer SetDataNamespace(old)
+
+	secret := packageMetadataObject("redis-v1", "test-ns", map[string]string{
+		zeusv1.LabelProject:        saolaconsts.ProjectOpenSaola,
+		zeusv1.LabelComponent:      "redis",
+		zeusv1.LabelPackageVersion: "1.0.0",
+		zeusv1.LabelEnabled:        "true",
+	})
+	cli := &metadataClient{objects: []*metav1.PartialObjectMetadata{secret}}
+
+	pkg, err := GetSummary(context.Background(), cli, "redis-v1")
+	if err != nil {
+		t.Fatalf("GetSummary returned error: %v", err)
+	}
+	if pkg.Name != "redis-v1" {
+		t.Errorf("expected package name redis-v1, got %q", pkg.Name)
+	}
+	if pkg.Component != "redis" {
+		t.Errorf("expected component redis, got %q", pkg.Component)
+	}
+	if pkg.Metadata == nil || pkg.Metadata.Name != "redis" || pkg.Metadata.Version != "1.0.0" {
+		t.Fatalf("unexpected metadata: %#v", pkg.Metadata)
+	}
+	if !pkg.Enabled {
+		t.Error("expected package to be enabled")
+	}
+	if len(pkg.Files) != 0 {
+		t.Errorf("expected GetSummary to avoid loading files, got %d files", len(pkg.Files))
+	}
+}
+
+func packageMetadataObject(name, namespace string, labels map[string]string) *metav1.PartialObjectMetadata {
+	obj := &metav1.PartialObjectMetadata{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+	}
+	obj.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	return obj
+}
+
+type metadataClient struct {
+	sigs.Client
+	objects []*metav1.PartialObjectMetadata
+}
+
+func (c *metadataClient) Get(_ context.Context, key sigs.ObjectKey, obj sigs.Object, _ ...sigs.GetOption) error {
+	target, ok := obj.(*metav1.PartialObjectMetadata)
+	if !ok {
+		return fmt.Errorf("unexpected get object type %T", obj)
+	}
+	for _, item := range c.objects {
+		if item.Name == key.Name && item.Namespace == key.Namespace {
+			*target = *item.DeepCopy()
+			return nil
+		}
+	}
+	return fmt.Errorf("metadata object %s/%s not found", key.Namespace, key.Name)
+}
+
+func (c *metadataClient) List(_ context.Context, list sigs.ObjectList, opts ...sigs.ListOption) error {
+	target, ok := list.(*metav1.PartialObjectMetadataList)
+	if !ok {
+		return fmt.Errorf("unexpected list object type %T", list)
+	}
+	listOpts := &sigs.ListOptions{}
+	for _, opt := range opts {
+		opt.ApplyToList(listOpts)
+	}
+	for _, item := range c.objects {
+		if listOpts.Namespace != "" && item.Namespace != listOpts.Namespace {
+			continue
+		}
+		if listOpts.LabelSelector != nil && !listOpts.LabelSelector.Matches(labels.Set(item.Labels)) {
+			continue
+		}
+		target.Items = append(target.Items, *item.DeepCopy())
+	}
+	return nil
 }
 
 // TestCompressDecompress_LargeData verifies roundtrip with larger data.

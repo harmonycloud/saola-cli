@@ -107,33 +107,55 @@ func (o *ListOptions) Run(ctx context.Context) error {
 		return nil
 	}
 
-	p, err := printer.New(o.Output)
+	return printPackages(o.Output, pkgs)
+}
+
+func printPackages(output string, pkgs []*packages.Package) error {
+	p, err := printer.New(output)
 	if err != nil {
 		return err
 	}
 
-	switch o.Output {
+	switch output {
 	case "yaml", "json":
 		return p.Print(os.Stdout, pkgs)
 	default:
-		rows := make([]pkgRow, 0, len(pkgs))
-		for _, pkg := range pkgs {
-			enabled := "false"
-			if pkg.Enabled {
-				enabled = "true"
-			}
-			ver := ""
-			if pkg.Metadata != nil {
-				ver = pkg.Metadata.Version
-			}
-			rows = append(rows, pkgRow{
-				Name:      pkg.Name,
-				Component: pkg.Component,
-				Version:   ver,
-				Enabled:   enabled,
-				Created:   pkg.Created,
-			})
-		}
-		return p.Print(os.Stdout, rows)
+		return p.Print(os.Stdout, packageRows(pkgs))
 	}
+}
+
+func printPackage(output string, pkg *packages.Package) error {
+	p, err := printer.New(output)
+	if err != nil {
+		return err
+	}
+
+	switch output {
+	case "yaml", "json":
+		return p.Print(os.Stdout, pkg)
+	default:
+		return p.Print(os.Stdout, packageRows([]*packages.Package{pkg}))
+	}
+}
+
+func packageRows(pkgs []*packages.Package) []pkgRow {
+	rows := make([]pkgRow, 0, len(pkgs))
+	for _, pkg := range pkgs {
+		enabled := "false"
+		if pkg.Enabled {
+			enabled = "true"
+		}
+		ver := ""
+		if pkg.Metadata != nil {
+			ver = pkg.Metadata.Version
+		}
+		rows = append(rows, pkgRow{
+			Name:      pkg.Name,
+			Component: pkg.Component,
+			Version:   ver,
+			Enabled:   enabled,
+			Created:   pkg.Created,
+		})
+	}
+	return rows
 }
