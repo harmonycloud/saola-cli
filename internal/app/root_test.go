@@ -34,7 +34,7 @@ func TestNewRootCmd_HasAllSubcommands(t *testing.T) {
 	}
 
 	expected := []string{"get", "create", "delete", "describe", "run",
-		"install", "uninstall", "upgrade", "build", "inspect", "version"}
+		"install", "uninstall", "upgrade", "build", "inspect", "validate", "images", "package", "version"}
 	for _, name := range expected {
 		if !subCmds[name] {
 			t.Errorf("missing subcommand: %s", name)

@@ -442,6 +442,49 @@ func TestBuild_InvalidDir(t *testing.T) {
 	}
 }
 
+func TestValidate_Success(t *testing.T) {
+	dir := makePkgDir(t)
+	o := &ValidateOptions{
+		Config: testConfig(),
+		PkgDir: dir,
+		Output: "table",
+	}
+	if err := o.Run(); err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+}
+
+func TestValidate_InvalidTemplate(t *testing.T) {
+	dir := makePkgDir(t)
+	configDir := filepath.Join(dir, "configurations")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir configurations: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "bad.yaml"), []byte(`apiVersion: middleware.cn/v1
+kind: MiddlewareConfiguration
+metadata:
+  name: bad-config
+spec:
+  template: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: "{{ .Globe.Name }}"
+      labels: {{ .Globe.Labels }}
+`), 0o644); err != nil {
+		t.Fatalf("write invalid configuration: %v", err)
+	}
+
+	o := &ValidateOptions{
+		Config: testConfig(),
+		PkgDir: dir,
+		Output: "table",
+	}
+	if err := o.Run(); err == nil {
+		t.Fatal("expected validation error for invalid rendered template")
+	}
+}
+
 // ─────────────────────────────────────────────
 // inspect tests
 // ─────────────────────────────────────────────

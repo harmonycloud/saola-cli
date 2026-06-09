@@ -31,8 +31,10 @@ import (
 	runcmd "github.com/harmonycloud/saola-cli/internal/cmd/run"
 	uninstallcmd "github.com/harmonycloud/saola-cli/internal/cmd/uninstall"
 	upgradecmd "github.com/harmonycloud/saola-cli/internal/cmd/upgrade"
+	validatecmd "github.com/harmonycloud/saola-cli/internal/cmd/validate"
 	versioncmd "github.com/harmonycloud/saola-cli/internal/cmd/version"
 
+	packagecmd "github.com/harmonycloud/saola-cli/internal/cmd/pkgcmd"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
@@ -83,7 +85,9 @@ func NewRootCmd() *cobra.Command {
 		upgradecmd.NewCmdUpgrade(cfg),
 		buildcmd.NewCmdBuild(cfg),
 		inspectcmd.NewCmdInspect(cfg),
+		validatecmd.NewCmdValidate(cfg),
 		imagescmd.NewCmdImages(cfg),
+		packagecmd.NewCmdPackage(cfg),
 		versioncmd.NewCmdVersion(cfg),
 	)
 

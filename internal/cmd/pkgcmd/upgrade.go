@@ -78,6 +78,10 @@ func NewCmdUpgrade(cfg *config.Config) *cobra.Command {
 //
 // 执行升级逻辑：打包、删除旧 Secret、创建新 Secret，可选等待安装完成。
 func (o *UpgradeOptions) Run(ctx context.Context) error {
+	fmt.Fprintf(os.Stdout, "Validating package directory %s ...\n", o.PkgDir)
+	if err := validatePackageDir(o.PkgDir); err != nil {
+		return err
+	}
 	fmt.Fprintf(os.Stdout, "Packing directory %s ...\n", o.PkgDir)
 	data, meta, err := packager.PackDir(o.PkgDir)
 	if err != nil {

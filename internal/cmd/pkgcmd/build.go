@@ -64,6 +64,10 @@ Useful for CI pipelines or offline distribution.`,
 }
 
 func (o *BuildOptions) Run() error {
+	fmt.Fprintf(os.Stdout, "Validating package directory %s ...\n", o.PkgDir)
+	if err := validatePackageDir(o.PkgDir); err != nil {
+		return err
+	}
 	fmt.Fprintf(os.Stdout, "Packing directory %s ...\n", o.PkgDir)
 	data, meta, err := packager.PackDir(o.PkgDir)
 	if err != nil {
