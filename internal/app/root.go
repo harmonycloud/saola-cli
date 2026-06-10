@@ -24,6 +24,7 @@ import (
 	createcmd "github.com/harmonycloud/saola-cli/internal/cmd/create"
 	deletecmd "github.com/harmonycloud/saola-cli/internal/cmd/delete"
 	describecmd "github.com/harmonycloud/saola-cli/internal/cmd/describe"
+	disablecmd "github.com/harmonycloud/saola-cli/internal/cmd/disable"
 	getcmd "github.com/harmonycloud/saola-cli/internal/cmd/get"
 	imagescmd "github.com/harmonycloud/saola-cli/internal/cmd/images"
 	inspectcmd "github.com/harmonycloud/saola-cli/internal/cmd/inspect"
@@ -79,6 +80,7 @@ func NewRootCmd() *cobra.Command {
 		createcmd.NewCmdCreate(cfg),
 		deletecmd.NewCmdDelete(cfg),
 		describecmd.NewCmdDescribe(cfg),
+		disablecmd.NewCmdDisable(cfg),
 		runcmd.NewCmdRun(cfg),
 		installcmd.NewCmdInstall(cfg),
 		uninstallcmd.NewCmdUninstall(cfg),

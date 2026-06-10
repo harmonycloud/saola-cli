@@ -245,8 +245,8 @@ sleep 15
 kubectl get mo -n $NS    # 应为空
 
 # 卸载包
-$SAOLA uninstall $PKG_NAME --pkg-namespace $PKG_NS
-kubectl get secrets -n $PKG_NS -l middleware.cn/project=opensaola  # 应显示卸载注解
+$SAOLA uninstall $PKG_NAME --pkg-namespace $PKG_NS --wait 5m
+kubectl get secret "$PKG_NAME" -n "$PKG_NS"  # 卸载完成后应为 NotFound
 
 # 删除测试命名空间
 kubectl delete namespace $NS

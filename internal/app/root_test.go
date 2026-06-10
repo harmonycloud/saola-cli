@@ -33,7 +33,7 @@ func TestNewRootCmd_HasAllSubcommands(t *testing.T) {
 		subCmds[sub.Name()] = true
 	}
 
-	expected := []string{"get", "create", "delete", "describe", "run",
+	expected := []string{"get", "create", "delete", "describe", "disable", "run",
 		"install", "uninstall", "upgrade", "build", "inspect", "validate", "images", "package", "version"}
 	for _, name := range expected {
 		if !subCmds[name] {

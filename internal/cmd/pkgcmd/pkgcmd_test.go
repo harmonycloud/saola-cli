@@ -244,9 +244,10 @@ func TestInstall_InvalidDir(t *testing.T) {
 // uninstall tests
 // ─────────────────────────────────────────────
 
-// TestUninstall_Success verifies that an existing Secret gets the uninstall annotation patched on.
+// TestUninstall_Success verifies that an existing Secret gets the package cleanup
+// finalizer and a delete request.
 //
-// TestUninstall_Success 验证对已存在 Secret 成功打上卸载注解。
+// TestUninstall_Success 验证对已存在 Secret 成功添加清理 finalizer 并发起删除。
 func TestUninstall_Success(t *testing.T) {
 	ns := "test-ns"
 	secret := &corev1.Secret{
@@ -269,14 +270,113 @@ func TestUninstall_Success(t *testing.T) {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
 
-	// Verify the annotation was patched.
-	// 验证注解已被打上。
+	// Verify the finalizer was patched before the delete request.
+	// 验证删除请求前已打上 finalizer。
 	got := &corev1.Secret{}
 	if err := cli.Get(context.Background(), sigs.ObjectKey{Name: "redis-v1", Namespace: ns}, got); err != nil {
 		t.Fatalf("get Secret after uninstall: %v", err)
 	}
-	if got.Annotations[zeusv1.LabelUnInstall] != "true" {
-		t.Errorf("expected uninstall annotation 'true', got %q", got.Annotations[zeusv1.LabelUnInstall])
+	if !hasString(got.Finalizers, finalizerPackageSecret) {
+		t.Fatalf("expected package cleanup finalizer, got %#v", got.Finalizers)
+	}
+	if got.GetDeletionTimestamp() == nil {
+		t.Fatalf("expected Secret to be pending deletion")
+	}
+}
+
+func TestUninstall_BlocksWhenPackageIsUsed(t *testing.T) {
+	ns := "test-ns"
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-v1",
+			Namespace: ns,
+			Labels: map[string]string{
+				zeusv1.LabelProject: saolaconsts.ProjectOpenSaola,
+			},
+		},
+	}
+	middleware := &zeusv1.Middleware{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-redis",
+			Namespace: "app",
+			Labels: map[string]string{
+				zeusv1.LabelPackageName: "redis-v1",
+			},
+		},
+		Spec: zeusv1.MiddlewareSpec{Baseline: "redis-cluster"},
+	}
+	cli := newFakeClient(secret, middleware)
+
+	o := &UninstallOptions{
+		Config: &config.Config{PkgNamespace: ns},
+		Name:   "redis-v1",
+		Client: cli,
+	}
+	err := o.Run(context.Background())
+	if err == nil {
+		t.Fatal("expected package usage error, got nil")
+	}
+	if !strings.Contains(err.Error(), "saola delete middleware my-redis -n app") {
+		t.Fatalf("expected delete hint in error, got: %v", err)
+	}
+
+	got := &corev1.Secret{}
+	if getErr := cli.Get(context.Background(), sigs.ObjectKey{Name: "redis-v1", Namespace: ns}, got); getErr != nil {
+		t.Fatalf("get Secret after failed uninstall: %v", getErr)
+	}
+	if got.Annotations[zeusv1.LabelUnInstall] == "true" {
+		t.Fatalf("uninstall annotation should not be patched when package is in use")
+	}
+	if hasString(got.Finalizers, finalizerPackageSecret) {
+		t.Fatalf("finalizer should not be patched when package is in use")
+	}
+}
+
+func TestDisable_Success(t *testing.T) {
+	ns := "test-ns"
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis-v1",
+			Namespace: ns,
+			Labels: map[string]string{
+				zeusv1.LabelProject: saolaconsts.ProjectOpenSaola,
+				zeusv1.LabelEnabled: "true",
+			},
+		},
+	}
+	mp := &zeusv1.MiddlewarePackage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "redis-v1",
+			Labels: map[string]string{
+				zeusv1.LabelEnabled: "true",
+			},
+		},
+	}
+	cli := newFakeClient(secret, mp)
+
+	o := &DisableOptions{
+		Config: &config.Config{PkgNamespace: ns},
+		Name:   "redis-v1",
+		Client: cli,
+	}
+	if err := o.Run(context.Background()); err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+
+	gotSecret := &corev1.Secret{}
+	if err := cli.Get(context.Background(), sigs.ObjectKey{Name: "redis-v1", Namespace: ns}, gotSecret); err != nil {
+		t.Fatalf("get Secret after disable: %v", err)
+	}
+	if gotSecret.Labels[zeusv1.LabelEnabled] != "false" {
+		t.Fatalf("expected Secret enabled=false, got %q", gotSecret.Labels[zeusv1.LabelEnabled])
+	}
+
+	gotMP := &zeusv1.MiddlewarePackage{}
+	if err := cli.Get(context.Background(), sigs.ObjectKey{Name: "redis-v1"}, gotMP); err != nil {
+		t.Fatalf("get MiddlewarePackage after disable: %v", err)
+	}
+	if gotMP.Labels[zeusv1.LabelEnabled] != "false" {
+		t.Fatalf("expected MiddlewarePackage enabled=false, got %q", gotMP.Labels[zeusv1.LabelEnabled])
 	}
 }
 

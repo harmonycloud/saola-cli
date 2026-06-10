@@ -55,10 +55,10 @@ func NewCmdUninstall(cfg *config.Config) *cobra.Command {
 		Use:   "uninstall <name>",
 		Short: lang.T("卸载中间件包", "Uninstall a middleware package"),
 		Long: lang.T(
-			`在包对应的 Secret 上添加卸载注解。
-OpenSaola 检测到注解后会自动卸载该包。`,
-			`Add the uninstall annotation to the package Secret.
-OpenSaola will pick up the annotation and uninstall the package.`,
+			`真实卸载中间件包。命令会先检查是否仍有 Middleware 或 MiddlewareOperator 引用该包；
+检查通过后给包 Secret 添加清理 finalizer 并发起删除，由 OpenSaola 清理包资源后移除 finalizer。`,
+			`Really uninstall a middleware package. The command first checks whether any Middleware or MiddlewareOperator still references the package;
+after the check passes, it adds a cleanup finalizer to the package Secret and deletes it; OpenSaola removes the finalizer after cleaning package resources.`,
 		),
 		Example: `  saola package uninstall redis-v1
   saola package uninstall redis-v1 --wait 5m`,
@@ -91,25 +91,52 @@ func (o *UninstallOptions) Run(ctx context.Context) error {
 		return fmt.Errorf("get Secret: %w", err)
 	}
 
-	// Patch: add the uninstall annotation.
-	patch := sigs.MergeFrom(secret.DeepCopy())
-	if secret.Annotations == nil {
-		secret.Annotations = make(map[string]string)
+	usages, err := findPackageUsages(ctx, cli, o.Name)
+	if err != nil {
+		return err
 	}
-	secret.Annotations[zeusv1.LabelUnInstall] = "true"
-	if err = cli.Patch(ctx, secret, patch); err != nil {
-		return fmt.Errorf("patch Secret: %w", err)
+	if err = packageUsageError(o.Name, usages); err != nil {
+		return err
 	}
-	fmt.Fprintf(os.Stdout, "Uninstall annotation added to Secret %s/%s\n", o.Config.PkgNamespace, o.Name)
+
+	if secret.GetDeletionTimestamp() != nil && !hasString(secret.Finalizers, finalizerPackageSecret) {
+		return fmt.Errorf("package Secret %q is already deleting without the OpenSaola package finalizer; cleanup cannot be guaranteed", o.Name)
+	}
+	if secret.GetDeletionTimestamp() == nil {
+		patch := sigs.MergeFrom(secret.DeepCopy())
+		if !hasString(secret.Finalizers, finalizerPackageSecret) {
+			secret.Finalizers = append(secret.Finalizers, finalizerPackageSecret)
+		}
+		if secret.Annotations != nil {
+			delete(secret.Annotations, zeusv1.LabelUnInstall)
+			delete(secret.Annotations, annotationUninstallError)
+		}
+		if err = cli.Patch(ctx, secret, patch); err != nil {
+			return fmt.Errorf("patch Secret finalizer: %w", err)
+		}
+		if err = cli.Delete(ctx, secret); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("delete Secret: %w", err)
+		}
+	}
+	fmt.Fprintf(os.Stdout, "Uninstall deletion requested for package Secret %s/%s\n", o.Config.PkgNamespace, o.Name)
 
 	if o.Wait > 0 {
 		fmt.Fprintf(os.Stdout, "Waiting up to %s for uninstallation to complete...\n", o.Wait)
 		waitCtx, cancel := context.WithTimeout(ctx, o.Wait)
 		defer cancel()
-		if err = waiter.WaitForUninstall(waitCtx, cli, o.Name, o.Config.PkgNamespace); err != nil {
+		if err = waiter.WaitForPackageDeleted(waitCtx, cli, o.Name, o.Config.PkgNamespace); err != nil {
 			return err
 		}
 		fmt.Fprintf(os.Stdout, "Package %s uninstalled successfully\n", o.Name)
 	}
 	return nil
+}
+
+func hasString(items []string, target string) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
 }

@@ -14,37 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pkgcmd
+package disable
 
 import (
+	"github.com/harmonycloud/saola-cli/internal/cmd/pkgcmd"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 )
 
-// NewCmdPackage returns the "package" sub-command group.
+// NewCmdDisable returns the top-level "disable" command.
 //
-// 返回 package 子命令组。
-func NewCmdPackage(cfg *config.Config) *cobra.Command {
+// NewCmdDisable 返回顶层 disable 命令。
+func NewCmdDisable(cfg *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "package",
-		Aliases: []string{"pkg"},
-		Short:   lang.T("管理中间件包", "Manage middleware packages"),
+		Use:   "disable",
+		Short: lang.T("禁用资源或包", "Disable resources or packages"),
 		Long: lang.T(
-			`安装、卸载、升级、列出、检查、校验并构建中间件包。`,
-			`Install, uninstall, upgrade, list, inspect, validate and build middleware packages.`,
+			`禁用资源或包。当前支持禁用中间件包，不删除包 Secret。`,
+			`Disable resources or packages. Currently supports disabling middleware packages without deleting package Secrets.`,
 		),
 	}
-
-	cmd.AddCommand(
-		NewCmdInstall(cfg),
-		NewCmdDisable(cfg),
-		NewCmdUninstall(cfg),
-		NewCmdUpgrade(cfg),
-		NewCmdList(cfg),
-		NewCmdInspect(cfg),
-		NewCmdValidate(cfg),
-		NewCmdBuild(cfg),
-	)
+	cmd.AddCommand(pkgcmd.NewCmdDisablePackage(cfg))
 	return cmd
 }

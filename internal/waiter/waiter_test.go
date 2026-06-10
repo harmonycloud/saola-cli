@@ -202,3 +202,29 @@ func TestWaitForUninstall_Timeout(t *testing.T) {
 		t.Errorf("expected error to mention 'timed out', got: %v", err)
 	}
 }
+
+func TestWaitForPackageDeleted_NotFound(t *testing.T) {
+	cli := newFakeClient()
+
+	if err := WaitForPackageDeleted(context.Background(), cli, "pkg-v1", "ns"); err != nil {
+		t.Fatalf("expected success for NotFound Secret, got: %v", err)
+	}
+}
+
+func TestWaitForPackageDeleted_UninstallError(t *testing.T) {
+	secret := makeSecret("pkg-v1", "ns", nil, map[string]string{
+		annotationUninstallError: "package is still used",
+	})
+	cli := newFakeClient(secret)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err := WaitForPackageDeleted(ctx, cli, "pkg-v1", "ns")
+	if err == nil {
+		t.Fatal("expected uninstall error, got nil")
+	}
+	if !strings.Contains(err.Error(), "package is still used") {
+		t.Fatalf("expected uninstall error annotation in error, got: %v", err)
+	}
+}

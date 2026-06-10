@@ -29,6 +29,8 @@ import (
 
 var pollInterval = 2 * time.Second
 
+const annotationUninstallError = "middleware.cn/uninstallError"
+
 // WaitForInstall polls until the package Secret becomes enabled=true (success),
 // an installError annotation is set (failure), or the context deadline is exceeded.
 //
@@ -92,6 +94,34 @@ func WaitForUninstall(ctx context.Context, cli client.Client, name, namespace st
 		// 当 operator 清除注解且 enabled=false 时，卸载完成。
 		if !enabled && !hasUninstallAnnotation {
 			return nil
+		}
+	}
+}
+
+// WaitForPackageDeleted polls until the package Secret is deleted, or until the
+// operator reports an uninstallError annotation.
+//
+// 轮询直到包 Secret 被删除，或 operator 写入 uninstallError 注解。
+func WaitForPackageDeleted(ctx context.Context, cli client.Client, name, namespace string) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for package %q to be deleted: %w", name, ctx.Err())
+		case <-time.After(pollInterval):
+		}
+
+		secret := &corev1.Secret{}
+		if err := cli.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, secret); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return fmt.Errorf("get secret %q: %w", name, err)
+		}
+
+		if secret.Annotations != nil {
+			if errMsg := secret.Annotations[annotationUninstallError]; errMsg != "" {
+				return fmt.Errorf("package %q uninstall failed: %s", name, errMsg)
+			}
 		}
 	}
 }

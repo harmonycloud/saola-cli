@@ -17,6 +17,8 @@ limitations under the License.
 package uninstall
 
 import (
+	"fmt"
+
 	"github.com/harmonycloud/saola-cli/internal/cmd/pkgcmd"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
@@ -32,19 +34,31 @@ func NewCmdUninstall(cfg *config.Config) *cobra.Command {
 	o := &pkgcmd.UninstallOptions{Config: cfg}
 
 	cmd := &cobra.Command{
-		Use:   "uninstall <name>",
+		Use:   "uninstall <name>|package <name>",
 		Short: lang.T("卸载中间件包", "Uninstall a middleware package"),
 		Long: lang.T(
-			`在包对应的 Secret 上添加卸载注解。
-OpenSaola 检测到注解后会自动卸载该包。`,
-			`Add the uninstall annotation to the package Secret.
-OpenSaola will pick up the annotation and uninstall the package.`,
+			`真实卸载中间件包。命令会先检查是否仍有 Middleware 或 MiddlewareOperator 引用该包；
+检查通过后给包 Secret 添加清理 finalizer 并发起删除，由 OpenSaola 清理包资源后移除 finalizer。`,
+			`Really uninstall a middleware package. The command first checks whether any Middleware or MiddlewareOperator still references the package;
+after the check passes, it adds a cleanup finalizer to the package Secret and deletes it; OpenSaola removes the finalizer after cleaning package resources.`,
 		),
 		Example: `  saola uninstall redis-v1
+  saola uninstall package redis-v1
   saola uninstall redis-v1 --wait 5m`,
-		Args: cobra.ExactArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				return nil
+			}
+			if len(args) == 2 && (args[0] == "package" || args[0] == "pkg") {
+				return nil
+			}
+			return fmt.Errorf("expected <name> or package <name>")
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Name = args[0]
+			if len(args) == 2 {
+				o.Name = args[1]
+			}
 			return o.Run(cmd.Context())
 		},
 	}

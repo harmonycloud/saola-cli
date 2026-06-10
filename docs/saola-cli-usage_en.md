@@ -72,6 +72,7 @@ Project name: `saola-cli`, compiled binary name: `saola`.
 - **Interactive Creation**: Terminal-guided forms (based on charmbracelet/huh) for selecting baselines, filling parameters, previewing YAML, and confirming creation.
 - **Bilingual Support**: Switch between Chinese (default) and English via `--lang`.
 - **kubectl-style Shortcut Commands**: `saola get`, `saola create`, `saola delete`, `saola describe`, `saola run`, etc.
+- **Separate disable and uninstall semantics**: `saola disable package <name>` only disables a package; `saola uninstall <name>` cleans package resources and deletes the package Secret.
 
 ### 1.3 Relationship with OpenSaola / dataservice-baseline
 
@@ -232,11 +233,29 @@ saola package install . --dry-run
 
 ---
 
+#### saola pkg disable
+
+**Syntax**: `saola package disable <name>`
+
+**Description**: Mark the package Secret as `enabled=false` without deleting the Secret or cleaning published Baseline / Configuration / Action resources.
+
+**Examples**:
+```bash
+saola package disable redis-v1
+saola disable package redis-v1
+```
+
+**Notes**:
+- Disable is a reversible state change and is not the same as uninstall.
+- If the package has a pending install/uninstall annotation, the command fails; wait for the current operation to complete before disabling.
+
+---
+
 #### saola pkg uninstall
 
 **Syntax**: `saola package uninstall <name> [flags]`
 
-**Description**: Add an uninstall annotation (`middleware.cn/uninstall=true`) to the package's corresponding Secret. OpenSaola will automatically uninstall the package upon detecting the annotation.
+**Description**: Request a real package uninstall. The CLI first checks whether any Middleware or MiddlewareOperator still references the package. If so, it fails and tells the user to delete those resources first. Once the check passes, the CLI adds the `middleware.cn/package-secret-cleanup` finalizer to the package Secret and sends a delete request; OpenSaola cleans package-published resources while the Secret is Terminating, then removes the finalizer so Kubernetes deletes the package Secret.
 
 **Arguments/Flags**:
 
@@ -252,7 +271,9 @@ saola package uninstall redis-v1 --wait 5m
 ```
 
 **Notes**:
-- Uninstallation completion is determined by: uninstall annotation cleared and `enabled=false`, or Secret deleted (NotFound).
+- Deployed Middleware / MiddlewareOperator resources must be deleted before uninstalling the package.
+- `--wait` completes only when the package Secret is deleted (NotFound).
+- If OpenSaola's second check finds that the package is still in use, it writes `middleware.cn/uninstallError` to the Secret and keeps the finalizer; after the references are deleted, a later operator retry continues cleanup.
 
 ---
 
@@ -803,11 +824,19 @@ Shortcut commands are top-level verb-style kubectl-like commands that provide a 
 
 ---
 
+#### saola disable
+
+`saola disable package` is equivalent to `saola package disable`.
+
+**Syntax**: `saola disable package <name>`
+
+---
+
 #### saola uninstall
 
-`saola uninstall` is equivalent to `saola package uninstall`.
+`saola uninstall` is equivalent to `saola package uninstall`, and also supports `saola uninstall package <name>`.
 
-**Syntax**: `saola uninstall <name> [--wait <duration>]`
+**Syntax**: `saola uninstall <name> [--wait <duration>]` or `saola uninstall package <name> [--wait <duration>]`
 
 ---
 
@@ -1078,11 +1107,14 @@ Install failure -> enabled=false, installError annotation set
 [Uninstall Request]
     |
     v
-Add uninstall annotation
+CLI checks Middleware / MiddlewareOperator references
     |
-    v (OpenSaola processes)
-Uninstall complete -> enabled=false, uninstall annotation removed
-      or -> Secret directly deleted
+    v
+Add package-secret-cleanup finalizer and delete the Secret
+    |
+    v (Secret Terminating, OpenSaola second-checks and processes)
+No references -> clean package resources -> delete MiddlewarePackage -> remove finalizer -> Secret deleted
+Still referenced -> write uninstallError and keep the finalizer
 ```
 
 ---
@@ -1129,8 +1161,15 @@ data:
 | Annotation Key | Value | Description |
 |----------------|-------|-------------|
 | `middleware.cn/install` | `"true"` | Triggers installation |
-| `middleware.cn/uninstall` | `"true"` | Triggers uninstallation |
+| `middleware.cn/uninstall` | `"true"` | Triggers the compatible soft-uninstall path |
 | `middleware.cn/installError` | error message | Set by operator on installation failure |
+| `middleware.cn/uninstallError` | error message | Set by operator on uninstallation failure |
+
+**Finalizers**:
+
+| Finalizer | Description |
+|-----------|-------------|
+| `middleware.cn/package-secret-cleanup` | Protects package Secret deletion; OpenSaola removes it after cleaning package resources and deleting the MiddlewarePackage |
 
 ### 5.3 Secret data Fields
 
