@@ -300,8 +300,20 @@ func (v *validator) validateConfigurationTemplates() {
 			v.addIssue(cfg.path, cfg.document, fmt.Sprintf("render spec.template: %v", err))
 			continue
 		}
+		if strings.TrimSpace(rendered) == "" && !allowsConditionallyEmptyRender(cfg.template) {
+			v.addIssue(cfg.path, cfg.document, "rendered spec.template is empty")
+			continue
+		}
 		v.validateRenderedYAML(cfg.path, cfg.document, rendered)
 	}
+}
+
+func allowsConditionallyEmptyRender(templateText string) bool {
+	trimmed := strings.TrimSpace(templateText)
+	return strings.HasPrefix(trimmed, "{{ if ") ||
+		strings.HasPrefix(trimmed, "{{- if ") ||
+		strings.HasPrefix(trimmed, "{{if ") ||
+		strings.HasPrefix(trimmed, "{{-if ")
 }
 
 func (v *validator) validateRenderedYAML(path string, docIndex int, rendered string) {
@@ -310,13 +322,9 @@ func (v *validator) validateRenderedYAML(path string, docIndex int, rendered str
 		return
 	}
 	reader := utilyaml.NewYAMLReader(bufio.NewReader(strings.NewReader(rendered)))
-	seen := false
 	for renderedDocIndex := 1; ; renderedDocIndex++ {
 		docData, err := reader.Read()
 		if err == io.EOF {
-			if !seen {
-				v.addIssue(path, docIndex, "rendered spec.template is empty")
-			}
 			return
 		}
 		if err != nil {
@@ -326,7 +334,6 @@ func (v *validator) validateRenderedYAML(path string, docIndex int, rendered str
 		if len(bytes.TrimSpace(docData)) == 0 {
 			continue
 		}
-		seen = true
 		var doc map[string]any
 		if err := utilyaml.Unmarshal(docData, &doc); err != nil {
 			v.addIssue(path, docIndex, fmt.Sprintf("parse rendered YAML document %d: %v", renderedDocIndex, err))

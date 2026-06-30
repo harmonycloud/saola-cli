@@ -20,13 +20,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
 	"github.com/harmonycloud/saola-cli/internal/client"
+	"github.com/harmonycloud/saola-cli/internal/cmdutil"
 	"github.com/harmonycloud/saola-cli/internal/config"
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -90,16 +93,23 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 	if err := cli.Get(ctx, sigs.ObjectKey{Name: o.Name, Namespace: ns}, action); err != nil {
 		return fmt.Errorf("get MiddlewareAction: %w", err)
 	}
+	eventRefs := []cmdutil.EventObjectRef{{
+		Kind:      "MiddlewareAction",
+		Namespace: action.Namespace,
+		Name:      action.Name,
+		UID:       action.UID,
+	}}
+	eventRefs = append(eventRefs, cmdutil.DiagnosticObjectEventRefs(action.Namespace, string(action.Status.Reason))...)
+	eventRefs = append(eventRefs, cmdutil.DiagnosticObjectEventRefsFromConditions(action.Namespace, action.Status.Conditions)...)
+	events, eventsErr := cmdutil.CollectObjectEventsForRefs(ctx, cli, eventRefs, 10)
 
-	printActionDescribe(action)
+	printActionDescribe(os.Stdout, action, events, eventsErr)
 	return nil
 }
 
 // printActionDescribe prints a human-readable summary of a MiddlewareAction.
 // printActionDescribe 打印 MiddlewareAction 的详细可读信息。
-func printActionDescribe(a *zeusv1.MiddlewareAction) {
-	w := os.Stdout
-
+func printActionDescribe(w io.Writer, a *zeusv1.MiddlewareAction, events []corev1.Event, eventsErr error) {
 	fmt.Fprintf(w, "Name:       %s\n", a.Name)
 	fmt.Fprintf(w, "Namespace:  %s\n", a.Namespace)
 	fmt.Fprintf(w, "Created:    %s\n", a.CreationTimestamp.String())
@@ -136,17 +146,20 @@ func printActionDescribe(a *zeusv1.MiddlewareAction) {
 		fmt.Fprintln(w, "Conditions:")
 		printConditions(w, a.Status.Conditions)
 	}
+	cmdutil.PrintDiagnostics(w, cmdutil.DiagnosticsOptions{
+		StatusReason: string(a.Status.Reason),
+		Conditions:   a.Status.Conditions,
+		RecentEvents: events,
+		EventsError:  eventsErr,
+	})
 }
 
 // printConditions prints a formatted conditions table.
 // printConditions 格式化打印 conditions 列表。
-func printConditions(w *os.File, conditions []metav1.Condition) {
+func printConditions(w io.Writer, conditions []metav1.Condition) {
 	fmt.Fprintf(w, "  %-40s %-8s %-30s %s\n", "TYPE", "STATUS", "REASON", "MESSAGE")
 	for _, c := range conditions {
-		msg := c.Message
-		if len(msg) > 60 {
-			msg = msg[:57] + "..."
-		}
+		msg := cmdutil.Truncate(c.Message, 60)
 		fmt.Fprintf(w, "  %-40s %-8s %-30s %s\n", c.Type, c.Status, c.Reason, msg)
 	}
 }

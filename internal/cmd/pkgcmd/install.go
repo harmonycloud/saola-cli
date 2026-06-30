@@ -82,10 +82,6 @@ OpenSaola picks up the Secret and installs the package automatically.`,
 
 func (o *InstallOptions) Run(ctx context.Context) error {
 	// 1. Pack the directory.
-	fmt.Fprintf(os.Stdout, "Validating package directory %s ...\n", o.PkgDir)
-	if err := validatePackageDir(o.PkgDir); err != nil {
-		return err
-	}
 	fmt.Fprintf(os.Stdout, "Packing directory %s ...\n", o.PkgDir)
 	data, meta, err := packager.PackDir(o.PkgDir)
 	if err != nil {

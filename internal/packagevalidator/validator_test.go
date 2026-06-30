@@ -67,6 +67,37 @@ data:
 	}
 }
 
+func TestValidateFilesAllowsConditionallyEmptyConfigurationTemplate(t *testing.T) {
+	files := validFiles(`{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Globe.Name }}"
+{{- end }}
+`)
+
+	result, err := ValidateFiles(files)
+	if err != nil {
+		t.Fatalf("expected conditionally empty template to be valid, got %v", err)
+	}
+	if result.Templates != 1 {
+		t.Fatalf("expected 1 rendered template, got %d", result.Templates)
+	}
+}
+
+func TestValidateFilesRejectsUnconditionalEmptyRender(t *testing.T) {
+	files := validFiles(`{{/* no rendered manifest */}}
+`)
+
+	_, err := ValidateFiles(files)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if !strings.Contains(err.Error(), "rendered spec.template is empty") {
+		t.Fatalf("expected empty rendered template error, got %v", err)
+	}
+}
+
 func TestValidateFilesRejectsTemplateParseError(t *testing.T) {
 	files := validFiles(`apiVersion: v1
 kind: ConfigMap

@@ -51,7 +51,7 @@ func (p *NamePrinter) Print(w io.Writer, data interface{}) error {
 	// Dereference pointer if needed.
 	//
 	// 必要时解引用指针。
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		v = v.Elem()
 	}
 
@@ -98,7 +98,7 @@ func extractName(v reflect.Value) (string, error) {
 	// Unwrap interface / pointer.
 	//
 	// 解包 interface / 指针。
-	for v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
+	for v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
 		v = v.Elem()
 	}
 

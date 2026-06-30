@@ -18,6 +18,7 @@ package middleware
 
 import (
 	"context"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -404,6 +405,86 @@ func TestMiddlewareDescribe_NotFound(t *testing.T) {
 	if !strings.Contains(err.Error(), "get middleware") {
 		t.Errorf("unexpected error message: %v", err)
 	}
+}
+
+func TestMiddlewareDescribe_PrintsFullFieldPathDiagnostic(t *testing.T) {
+	diagnostic := "phase=config-validation; resource=middleware.cn/v1/Middleware middleware/demo-milvus; fieldPath=spec.necessary.resource.etcd.volume; expected=present; actual=missing; generation=7; observedGeneration=6; staleStatus=true"
+	mw := &zeusv1.Middleware{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "demo-milvus",
+			Namespace:  "middleware",
+			Generation: 7,
+		},
+		Spec: zeusv1.MiddlewareSpec{Baseline: "milvus"},
+		Status: zeusv1.MiddlewareStatus{
+			ObservedGeneration: 6,
+			Reason:             diagnostic,
+			CustomResources: zeusv1.CustomResources{
+				Phase:  zeusv1.PhaseFailed,
+				Reason: diagnostic,
+			},
+			Conditions: []metav1.Condition{{
+				Type:    "Checked",
+				Status:  metav1.ConditionFalse,
+				Reason:  "MissingRequiredField",
+				Message: diagnostic,
+			}},
+		},
+	}
+	o := &DescribeOptions{
+		Config:    newCfg("middleware"),
+		Name:      "demo-milvus",
+		Namespace: "middleware",
+		Client:    newFakeClient(mw),
+	}
+
+	got, err := captureStdout(func() error {
+		return o.Run(context.Background())
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	for _, want := range []string{
+		"Name:",
+		"demo-milvus",
+		"Namespace:",
+		"middleware",
+		"ObservedGeneration:",
+		"6",
+		"Phase:",
+		"Failed",
+		"Diagnostics:",
+		"fieldPath=spec.necessary.resource.etcd.volume",
+		"expected=present",
+		"actual=missing",
+		"generation=7",
+		"observedGeneration=6",
+		"staleStatus=true",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected middleware describe output to contain %q, got %q", want, got)
+		}
+	}
+}
+
+func captureStdout(run func() error) (string, error) {
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		return "", err
+	}
+	os.Stdout = w
+	runErr := run()
+	_ = w.Close()
+	os.Stdout = old
+	out, readErr := io.ReadAll(r)
+	if readErr != nil {
+		return "", readErr
+	}
+	if runErr != nil {
+		return string(out), runErr
+	}
+	return string(out), nil
 }
 
 // ---------------------------------------------------------------------------

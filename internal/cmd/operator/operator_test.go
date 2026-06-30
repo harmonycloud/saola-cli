@@ -17,6 +17,7 @@ limitations under the License.
 package operator
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"strings"
@@ -404,5 +405,71 @@ func TestOperatorDescribe_NotFound(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "ghost-operator") {
 		t.Errorf("expected object name in error, got: %v", err)
+	}
+}
+
+func TestOperatorDescribe_PrintsFullRuntimeDiagnostics(t *testing.T) {
+	fullDiagnostic := "phase=workload-readiness; resource=middleware.cn/v1/MiddlewareOperator middleware-operator/opensaola; failedObject=v1/Pod middleware-operator/opensaola-install-crds; ownerRef=apps/v1/Deployment middleware-operator/opensaola-controller-manager; fieldPath=status.containerStatuses[name=kubectl].state.waiting; actual=ImagePullBackOff; generation=4; observedGeneration=3; staleStatus=true; causeCategory=RegistryTLS; cause=container=kubectl; image=10.10.101.172:443/middleware/kubectl:v1.30.14; reason=ImagePullBackOff; message=ErrImagePull: failed to pull image: x509: certificate signed by unknown authority; next=kubectl describe pod opensaola-install-crds -n middleware-operator"
+	mo := &zeusv1.MiddlewareOperator{
+		ObjectMeta: metav1.ObjectMeta{Name: "opensaola", Namespace: "middleware-operator"},
+		Status: zeusv1.MiddlewareOperatorStatus{
+			ObservedGeneration: 11,
+			Runtime:            fullDiagnostic,
+			OperatorAvailable:  "0/1",
+			Ready:              false,
+			Conditions: []metav1.Condition{{
+				Type:    "Ready",
+				Status:  metav1.ConditionFalse,
+				Reason:  "ImagePullBackOff",
+				Message: fullDiagnostic,
+			}},
+			OperatorStatus: map[string]appsv1.DeploymentStatus{
+				"opensaola-controller-manager": {
+					Replicas: 1,
+					Conditions: []appsv1.DeploymentCondition{{
+						Type:    appsv1.DeploymentProgressing,
+						Status:  corev1.ConditionFalse,
+						Reason:  "ProgressDeadlineExceeded",
+						Message: "Deployment exceeded its progress deadline",
+					}},
+				},
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	eventMessage := "failed to pull image \"10.10.101.172:443/middleware/kubectl:v1.30.14\": x509: certificate signed by unknown authority"
+	printDescribe(&out, mo, []corev1.Event{{
+		ObjectMeta: metav1.ObjectMeta{Name: "pull-failed", Namespace: "middleware-operator"},
+		Type:       corev1.EventTypeWarning,
+		Reason:     "FailedPull",
+		Message:    eventMessage,
+		Count:      3,
+		InvolvedObject: corev1.ObjectReference{
+			Kind: "MiddlewareOperator",
+			Name: "opensaola",
+		},
+	}}, nil)
+	got := out.String()
+	for _, want := range []string{
+		"Runtime:",
+		"OperatorAvailable:",
+		"0/1",
+		"ObservedGeneration:",
+		"11",
+		"ProgressDeadlineExceeded",
+		"Diagnostics:",
+		"failedObject=v1/Pod middleware-operator/opensaola-install-crds",
+		"causeCategory=RegistryTLS",
+		"10.10.101.172:443/middleware/kubectl:v1.30.14",
+		"x509: certificate signed by unknown authority",
+		"staleStatus=true",
+		"Recent Events:",
+		"Warning FailedPull count=3 involvedObject=MiddlewareOperator/middleware-operator/opensaola",
+		eventMessage,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected operator describe output to contain %q, got %q", want, got)
+		}
 	}
 }

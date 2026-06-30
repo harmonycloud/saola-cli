@@ -99,7 +99,7 @@ func printMapTable(w io.Writer, rows []map[string]string) error {
 
 func printStructTable(w io.Writer, data interface{}) error {
 	val := reflect.ValueOf(data)
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 	if val.Kind() != reflect.Slice {
@@ -110,7 +110,7 @@ func printStructTable(w io.Writer, data interface{}) error {
 		return nil
 	}
 	elem := val.Index(0)
-	if elem.Kind() == reflect.Ptr {
+	if elem.Kind() == reflect.Pointer {
 		elem = elem.Elem()
 	}
 	if elem.Kind() != reflect.Struct {
@@ -136,7 +136,7 @@ func printStructTable(w io.Writer, data interface{}) error {
 	}
 	for i := 0; i < val.Len(); i++ {
 		item := val.Index(i)
-		if item.Kind() == reflect.Ptr {
+		if item.Kind() == reflect.Pointer {
 			item = item.Elem()
 		}
 		vals := make([]string, 0, len(headers))
@@ -154,7 +154,7 @@ func printStructTable(w io.Writer, data interface{}) error {
 }
 
 func printStructFields(w io.Writer, val reflect.Value) error {
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 	if val.Kind() != reflect.Struct {

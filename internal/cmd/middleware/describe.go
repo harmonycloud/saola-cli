@@ -103,6 +103,15 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get middleware %s/%s: %w", ns, o.Name, err)
 	}
+	eventRefs := []cmdutil.EventObjectRef{{
+		Kind:      "Middleware",
+		Namespace: mw.Namespace,
+		Name:      mw.Name,
+		UID:       mw.UID,
+	}}
+	eventRefs = append(eventRefs, cmdutil.DiagnosticObjectEventRefs(mw.Namespace, mw.Status.Reason, mw.Status.CustomResources.Reason)...)
+	eventRefs = append(eventRefs, cmdutil.DiagnosticObjectEventRefsFromConditions(mw.Namespace, mw.Status.Conditions)...)
+	events, eventsErr := cmdutil.CollectObjectEventsForRefs(ctx, cli, eventRefs, 10)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer func() {
@@ -187,6 +196,14 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 			)
 		}
 	}
+
+	cmdutil.PrintDiagnostics(w, cmdutil.DiagnosticsOptions{
+		StatusReason:         mw.Status.Reason,
+		CustomResourceReason: mw.Status.CustomResources.Reason,
+		Conditions:           mw.Status.Conditions,
+		RecentEvents:         events,
+		EventsError:          eventsErr,
+	})
 
 	return nil
 }

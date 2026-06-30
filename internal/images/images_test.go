@@ -56,6 +56,14 @@ func TestDiscoverPackageImages_ExpandsMultipleRepositories(t *testing.T) {
 		"repo-a.example:5000/middleware/redis-sidecar:v1.2.3",
 		"repo-b.example:5000/middleware/redis-sidecar:v1.2.3",
 	})
+	assertCandidateImages(t, groups, "redis-dashboard:v8.2.6", []string{
+		"repo-a.example:5000/middleware/redis-dashboard:v8.2.6",
+		"repo-b.example:5000/middleware/redis-dashboard:v8.2.6",
+	})
+	assertCandidateImages(t, groups, "redis-exporter:v8.2.6", []string{
+		"repo-a.example:5000/middleware/redis-exporter:v8.2.6",
+		"repo-b.example:5000/middleware/redis-exporter:v8.2.6",
+	})
 }
 
 func TestExportPackage_DryRunBuildsLock(t *testing.T) {
@@ -79,6 +87,68 @@ func TestExportPackage_DryRunBuildsLock(t *testing.T) {
 	if len(result.Resolved) != 0 {
 		t.Fatalf("dry-run should not resolve images, got %#v", result.Resolved)
 	}
+}
+
+func TestDiscoverPackageImages_ReferencedMultiDocumentConfiguration(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "metadata.yaml"), `name: MultiDoc
+version: 1.0.0
+app:
+  version:
+    - "1.0.0"
+`)
+	writeFile(t, filepath.Join(dir, "baselines", "cluster.yaml"), `apiVersion: middleware.harmonycloud.cn/v1
+kind: MiddlewareBaseline
+metadata:
+  name: multidoc-cluster
+spec:
+  necessary:
+    repository: ""
+    version: '{"type":"version","default":"1.0.0"}'
+  configurations:
+    - name: second-doc
+      values:
+        repository: "{{ .Necessary.repository }}"
+        tag: "{{ .Necessary.version }}"
+`)
+	writeFile(t, filepath.Join(dir, "configurations", "multi.yaml"), `apiVersion: middleware.harmonycloud.cn/v1
+kind: MiddlewareConfiguration
+metadata:
+  name: first-doc
+spec:
+  template: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    spec:
+      template:
+        spec:
+          containers:
+            - name: first
+              image: "{{ .Values.repository }}/first:{{ .Values.tag }}"
+---
+apiVersion: middleware.harmonycloud.cn/v1
+kind: MiddlewareConfiguration
+metadata:
+  name: second-doc
+spec:
+  template: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    spec:
+      template:
+        spec:
+          containers:
+            - name: second
+              image: "{{ .Values.repository }}/second:{{ .Values.tag }}"
+`)
+
+	_, groups, err := DiscoverPackageImages(dir, []string{"repo.example/middleware"})
+	if err != nil {
+		t.Fatalf("DiscoverPackageImages: %v", err)
+	}
+	assertCandidateImages(t, groups, "second:1.0.0", []string{"repo.example/middleware/second:1.0.0"})
+	assertNoImageGroup(t, groups, "first:1.0.0")
 }
 
 func TestResolveImages_UsesFirstExistingRepository(t *testing.T) {
@@ -112,6 +182,95 @@ func TestResolveImages_UsesFirstExistingRepository(t *testing.T) {
 	}
 }
 
+func TestResolveImages_RegistryTLSErrorKeepsCandidateContext(t *testing.T) {
+	t.Parallel()
+
+	image := "10.10.101.172:443/middleware/kubectl:v1.30.14"
+	runner := &fakeRunner{
+		tools: map[string]bool{toolSkopeo: true},
+		inspectErrors: map[string]error{
+			image: errors.New("x509: certificate signed by unknown authority"),
+		},
+	}
+	groups := []ImageGroup{{
+		Name: "kubectl:v1.30.14",
+		Candidates: []ImageCandidate{{
+			Image:      image,
+			Repository: "10.10.101.172:443/middleware",
+			File:       "chart/templates/upgrade-crds.yaml",
+			Field:      "spec.template.spec.containers[0].image",
+		}},
+	}}
+
+	resolved, missing, err := resolveImages(context.Background(), runner, groups, ExportOptions{Timeout: time.Second})
+	if err != nil {
+		t.Fatalf("resolveImages: %v", err)
+	}
+	if len(resolved) != 0 {
+		t.Fatalf("expected no resolved images, got %#v", resolved)
+	}
+	if len(missing) != 1 || len(missing[0].ProbeErrors) != 1 {
+		t.Fatalf("expected missing image with probe error, got %#v", missing)
+	}
+
+	msg := formatMissingImagesError(missing)
+	for _, want := range []string{
+		"image=kubectl:v1.30.14",
+		"candidate=10.10.101.172:443/middleware/kubectl:v1.30.14",
+		"file=chart/templates/upgrade-crds.yaml",
+		"field=spec.template.spec.containers[0].image",
+		"reason=RegistryTLS",
+		"x509: certificate signed by unknown authority",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("expected missing image error to contain %q, got %q", want, msg)
+		}
+	}
+}
+
+func TestExportWithSkopeo_UsesPlatformOverrideParts(t *testing.T) {
+	t.Parallel()
+	runner := &fakeRunner{tools: map[string]bool{toolSkopeo: true}}
+	output := filepath.Join(t.TempDir(), "images.tar")
+
+	err := exportWithSkopeo(context.Background(), runner, []ResolvedImage{{
+		Name:  "redis:v1.0.0",
+		Image: "repo.example/middleware/redis:v1.0.0",
+	}}, output, ExportOptions{
+		Platform:  "linux/amd64",
+		Insecure:  true,
+		Timeout:   time.Second,
+		MultiArch: true,
+	})
+	if err != nil {
+		t.Fatalf("exportWithSkopeo: %v", err)
+	}
+	if len(runner.runs) != 1 {
+		t.Fatalf("expected one skopeo copy run, got %#v", runner.runs)
+	}
+	got := strings.Join(runner.runs[0].args, " ")
+	for _, want := range []string{
+		"--override-os linux",
+		"--override-arch amd64",
+		"--src-tls-verify=false",
+		"docker://repo.example/middleware/redis:v1.0.0",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected args to contain %q, got %q", want, got)
+		}
+	}
+	if strings.Contains(got, "--override-platform") {
+		t.Fatalf("skopeo does not support --override-platform, got %q", got)
+	}
+}
+
+func TestSkopeoPlatformArgsRejectsInvalidPlatform(t *testing.T) {
+	t.Parallel()
+	if _, err := skopeoPlatformArgs("linux"); err == nil {
+		t.Fatal("expected invalid platform error")
+	}
+}
+
 func makeImagePackage(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -141,6 +300,45 @@ spec:
   sidecar:
     repository: "{{ .Necessary.repository }}/redis-sidecar"
     tag: "v1.2.3"
+  configurations:
+    - name: redis-dashboard
+      values:
+        repository: "{{ .Necessary.repository }}"
+        version: "{{ .Necessary.version }}"
+    - name: redis-exporter
+      values:
+        repository: "{{ .Necessary.repository }}"
+        tag: "{{ .Necessary.version }}"
+`)
+	writeFile(t, filepath.Join(dir, "configurations", "redis-dashboard.yaml"), `apiVersion: middleware.harmonycloud.cn/v1
+kind: MiddlewareConfiguration
+metadata:
+  name: redis-dashboard
+spec:
+  template:
+    spec:
+      containers:
+        - name: dashboard
+          image: "{{ .Values.repository }}/redis-dashboard:v{{ .Values.version }}"
+`)
+	writeFile(t, filepath.Join(dir, "configurations", "redis-exporter.yaml"), `apiVersion: middleware.harmonycloud.cn/v1
+kind: MiddlewareConfiguration
+metadata:
+  name: redis-exporter
+spec:
+  template: |-
+    {{- $repo := tpl (toString (.Values.repository | default .Necessary.repository)) . }}
+    {{- $tag := tpl (toString (.Values.tag | default .Necessary.version)) . }}
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: redis-exporter
+    spec:
+      template:
+        spec:
+          containers:
+            - name: exporter
+              image: "{{ $repo }}/redis-exporter:v{{ $tag }}"
 `)
 	return dir
 }
@@ -173,10 +371,26 @@ func assertCandidateImages(t *testing.T, groups []ImageGroup, name string, want 
 	t.Fatalf("group %q not found in %#v", name, groups)
 }
 
+func assertNoImageGroup(t *testing.T, groups []ImageGroup, name string) {
+	t.Helper()
+	for _, group := range groups {
+		if group.Name == name {
+			t.Fatalf("group %q should not be present: %#v", name, group)
+		}
+	}
+}
+
 type fakeRunner struct {
-	tools    map[string]bool
-	existing map[string]bool
-	probed   []string
+	tools         map[string]bool
+	existing      map[string]bool
+	inspectErrors map[string]error
+	probed        []string
+	runs          []fakeRun
+}
+
+type fakeRun struct {
+	name string
+	args []string
 }
 
 func (r *fakeRunner) LookPath(file string) (string, error) {
@@ -187,11 +401,15 @@ func (r *fakeRunner) LookPath(file string) (string, error) {
 }
 
 func (r *fakeRunner) Run(_ context.Context, name string, args ...string) error {
+	r.runs = append(r.runs, fakeRun{name: name, args: append([]string(nil), args...)})
 	if name != toolSkopeo || len(args) < 1 || args[0] != "inspect" {
 		return nil
 	}
 	image := strings.TrimPrefix(args[len(args)-1], "docker://")
 	r.probed = append(r.probed, image)
+	if err := r.inspectErrors[image]; err != nil {
+		return err
+	}
 	if r.existing[image] {
 		return nil
 	}

@@ -203,6 +203,42 @@ func TestInstall_Success(t *testing.T) {
 	}
 }
 
+// TestInstall_DoesNotRunPackageValidation verifies install only packs and uploads
+// the directory. Package validation remains available through "saola validate".
+//
+// TestInstall_DoesNotRunPackageValidation 验证 install 只打包并上传目录；
+// 包校验由 "saola validate" 单独承担。
+func TestInstall_DoesNotRunPackageValidation(t *testing.T) {
+	dir := makePkgDir(t)
+	configDir := filepath.Join(dir, "configurations")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir configurations: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(configDir, "broken.yaml"),
+		[]byte("apiVersion: middleware.cn/v1\nkind: MiddlewareConfiguration\nmetadata:\n  name: broken\nspec:\n  template: |\n    apiVersion: v1\n    kind: ConfigMap\n    metadata\n      name: broken\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write invalid package file: %v", err)
+	}
+
+	cli := newFakeClient()
+	o := &InstallOptions{
+		Config: testConfig(),
+		PkgDir: dir,
+		Client: cli,
+	}
+	if err := o.Run(context.Background()); err != nil {
+		t.Fatalf("expected install to upload without package validation, got: %v", err)
+	}
+
+	secret := &corev1.Secret{}
+	key := sigs.ObjectKey{Name: "testpkg-1.0.0", Namespace: "test-ns"}
+	if err := cli.Get(context.Background(), key, secret); err != nil {
+		t.Fatalf("Secret not found after install: %v", err)
+	}
+}
+
 // TestInstall_AlreadyExists verifies that installing over an existing Secret returns an error.
 //
 // TestInstall_AlreadyExists 验证对已存在 Secret 安装时返回 "already exists" 错误。

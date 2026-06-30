@@ -18,7 +18,10 @@ package images
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os/exec"
+	"strings"
 )
 
 // Runner abstracts external command execution for tests.
@@ -40,6 +43,20 @@ func (r ExecRunner) LookPath(file string) (string, error) {
 
 func (r ExecRunner) Run(ctx context.Context, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	if text := strings.TrimSpace(string(output)); text != "" {
+		return fmt.Errorf("%w: %s", err, text)
+	}
+	return err
+}
+
+func (r ExecRunner) RunStreaming(ctx context.Context, stdout io.Writer, stderr io.Writer, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 	return cmd.Run()
 }
 

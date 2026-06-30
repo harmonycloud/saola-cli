@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"strings"
 	"text/template"
+
+	"github.com/Masterminds/sprig/v3"
 )
 
 type templateValues struct {
@@ -46,15 +48,25 @@ func renderImageTemplate(text string, values templateValues) (string, error) {
 }
 
 func templateFuncs() template.FuncMap {
-	return template.FuncMap{
-		"dict":     dictFunc,
-		"set":      setFunc,
-		"default":  defaultFunc,
-		"contains": strings.Contains,
-		"replace":  replaceFunc,
-		"hasKey":   hasKeyFunc,
-		"toJson":   toJSONFunc,
+	funcs := sprig.HermeticTxtFuncMap()
+	funcs["dict"] = dictFunc
+	funcs["set"] = setFunc
+	funcs["default"] = defaultFunc
+	funcs["contains"] = strings.Contains
+	funcs["replace"] = replaceFunc
+	funcs["hasKey"] = hasKeyFunc
+	funcs["toJson"] = toJSONFunc
+	funcs["tpl"] = func(tplText string, vals any) (string, error) {
+		switch typed := vals.(type) {
+		case templateValues:
+			return renderImageTemplate(tplText, typed)
+		case *templateValues:
+			return renderImageTemplate(tplText, *typed)
+		default:
+			return tplText, nil
+		}
 	}
+	return funcs
 }
 
 func dictFunc(values ...any) (map[string]any, error) {

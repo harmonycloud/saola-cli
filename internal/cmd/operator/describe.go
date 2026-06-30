@@ -19,6 +19,7 @@ package operator
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -30,6 +31,7 @@ import (
 	"github.com/harmonycloud/saola-cli/internal/lang"
 	"github.com/spf13/cobra"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	sigs "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -103,15 +105,24 @@ func (o *DescribeOptions) Run(ctx context.Context) error {
 	if err := cli.Get(ctx, sigs.ObjectKey{Name: o.Name, Namespace: ns}, mo); err != nil {
 		return fmt.Errorf("get MiddlewareOperator %s/%s: %w", ns, o.Name, err)
 	}
+	eventRefs := []cmdutil.EventObjectRef{{
+		Kind:      "MiddlewareOperator",
+		Namespace: mo.Namespace,
+		Name:      mo.Name,
+		UID:       mo.UID,
+	}}
+	eventRefs = append(eventRefs, cmdutil.DiagnosticObjectEventRefs(mo.Namespace, mo.Status.Runtime, mo.Status.Reason)...)
+	eventRefs = append(eventRefs, cmdutil.DiagnosticObjectEventRefsFromConditions(mo.Namespace, mo.Status.Conditions)...)
+	events, eventsErr := cmdutil.CollectObjectEventsForRefs(ctx, cli, eventRefs, 10)
 
-	printDescribe(os.Stdout, mo)
+	printDescribe(os.Stdout, mo, events, eventsErr)
 	return nil
 }
 
 // printDescribe writes formatted describe output.
 //
 // printDescribe 格式化输出 describe 信息。
-func printDescribe(w *os.File, mo *zeusv1.MiddlewareOperator) {
+func printDescribe(w io.Writer, mo *zeusv1.MiddlewareOperator, events []corev1.Event, eventsErr error) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	defer func() {
 		_ = tw.Flush()
@@ -186,6 +197,14 @@ func printDescribe(w *os.File, mo *zeusv1.MiddlewareOperator) {
 			printDeploymentStatus(tw, ds)
 		}
 	}
+
+	cmdutil.PrintDiagnostics(tw, cmdutil.DiagnosticsOptions{
+		StatusReason: mo.Status.Reason,
+		Runtime:      mo.Status.Runtime,
+		Conditions:   mo.Status.Conditions,
+		RecentEvents: events,
+		EventsError:  eventsErr,
+	})
 
 	// Finalizers.
 	//

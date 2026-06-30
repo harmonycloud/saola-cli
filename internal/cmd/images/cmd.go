@@ -57,13 +57,14 @@ type ExportOptions struct {
 func NewCmdImages(cfg *config.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "images",
-		Short: lang.T("发现并导出包依赖的容器镜像", "Discover and export package container images"),
+		Short: lang.T("发现、导出并导入包依赖的容器镜像", "Discover, export, and import package container images"),
 		Long: lang.T(
-			`发现本地中间件包中的镜像引用，并从一个或多个候选仓库中导出实际存在的镜像。`,
-			`Discover image references in a local middleware package and export existing images from one or more candidate repositories.`,
+			`发现本地中间件包中的镜像引用，从一个或多个候选仓库导出实际存在的镜像，并把导出的归档推送（导入）到目标仓库。`,
+			`Discover image references in a local middleware package, export existing images from candidate repositories, and import (push) an exported archive into a target repository.`,
 		),
 	}
 	cmd.AddCommand(NewCmdExport(cfg))
+	cmd.AddCommand(NewCmdImport(cfg))
 	return cmd
 }
 
@@ -75,7 +76,7 @@ func NewCmdExport(cfg *config.Config) *cobra.Command {
 		Config:    cfg,
 		Platform:  "all",
 		MultiArch: true,
-		Timeout:   30 * time.Second,
+		Timeout:   imageexport.DefaultProbeTimeout,
 		Out:       os.Stdout,
 		ErrOut:    os.Stderr,
 	}
@@ -107,7 +108,7 @@ func NewCmdExport(cfg *config.Config) *cobra.Command {
 	cmd.Flags().BoolVar(&o.Insecure, "insecure", false, lang.T("跳过镜像仓库 TLS 校验", "Skip registry TLS verification"))
 	cmd.Flags().BoolVar(&o.SkipMissing, "skip-missing", false, lang.T("存在无法解析的镜像时仍导出已命中的镜像", "Export resolved images even when some images are missing"))
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, lang.T("仅打印镜像候选，不执行导出", "Print image candidates without exporting"))
-	cmd.Flags().DurationVar(&o.Timeout, "timeout", 30*time.Second, lang.T("单个镜像探测或导出的超时时间", "Timeout for each image probe or export"))
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", imageexport.DefaultProbeTimeout, lang.T("单个镜像探测的超时时间", "Timeout for each image probe"))
 	return cmd
 }
 
@@ -135,6 +136,7 @@ func (o *ExportOptions) Run(ctx context.Context) error {
 		SkipMissing:  o.SkipMissing,
 		DryRun:       o.DryRun,
 		Timeout:      o.Timeout,
+		ProgressOut:  errOut,
 		Runner:       o.Runner,
 	})
 	if err != nil {

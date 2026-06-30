@@ -17,8 +17,10 @@ limitations under the License.
 package action
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	zeusv1 "github.com/harmonycloud/opensaola/api/v1"
@@ -247,5 +249,35 @@ func TestActionDescribe_Found(t *testing.T) {
 
 	if err := o.Run(context.Background()); err != nil {
 		t.Fatalf("Run() unexpected error: %v", err)
+	}
+}
+
+func TestActionDescribe_PrintsFullDiagnostics(t *testing.T) {
+	message := "phase=runtime-reconcile; resource=middleware.cn/v1/MiddlewareAction default/my-action-999; fieldPath=spec.preActions[0].necessary; expected=cue schema match; actual=字段路径错误：spec.necessary.resource.etcd.volume 缺失; generation=5; observedGeneration=4; staleStatus=true"
+	action := &zeusv1.MiddlewareAction{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-action-999", Namespace: "default"},
+		Status: zeusv1.MiddlewareActionStatus{
+			Reason: metav1.StatusReason(message),
+			Conditions: []metav1.Condition{{
+				Type:    "PreAction",
+				Status:  metav1.ConditionFalse,
+				Reason:  "ValidationFailed",
+				Message: message,
+			}},
+		},
+	}
+
+	var out bytes.Buffer
+	printActionDescribe(&out, action, nil, nil)
+	got := out.String()
+	for _, want := range []string{
+		"Diagnostics:",
+		"fieldPath=spec.preActions[0].necessary",
+		"字段路径错误：spec.necessary.resource.etcd.volume",
+		"staleStatus=true",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected action describe output to contain %q, got %q", want, got)
+		}
 	}
 }

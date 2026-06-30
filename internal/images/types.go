@@ -16,7 +16,15 @@ limitations under the License.
 
 package images
 
-import "time"
+import (
+	"io"
+	"time"
+)
+
+// DefaultProbeTimeout is the per-image timeout used for probing image existence.
+//
+// DefaultProbeTimeout 是单个镜像存在性探测的默认超时时间。
+const DefaultProbeTimeout = 30 * time.Second
 
 // PackageMetadata contains the package fields needed by image export.
 //
@@ -66,12 +74,25 @@ type ResolvedImage struct {
 	Candidates []ImageCandidate `json:"candidates,omitempty" yaml:"candidates,omitempty"`
 }
 
+// ProbeError records why a concrete image candidate failed inspection.
+//
+// ProbeError 记录某个候选镜像探测失败的原因。
+type ProbeError struct {
+	Image      string `json:"image" yaml:"image"`
+	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
+	File       string `json:"file,omitempty" yaml:"file,omitempty"`
+	Field      string `json:"field,omitempty" yaml:"field,omitempty"`
+	Reason     string `json:"reason" yaml:"reason"`
+	Message    string `json:"message" yaml:"message"`
+}
+
 // MissingImage records candidates that could not be resolved.
 //
 // MissingImage 记录未能命中的镜像候选。
 type MissingImage struct {
-	Name       string           `json:"name" yaml:"name"`
-	Candidates []ImageCandidate `json:"candidates" yaml:"candidates"`
+	Name        string           `json:"name" yaml:"name"`
+	Candidates  []ImageCandidate `json:"candidates" yaml:"candidates"`
+	ProbeErrors []ProbeError     `json:"probeErrors,omitempty" yaml:"probeErrors,omitempty"`
 }
 
 // LockFile is written next to the exported image archive.
@@ -99,5 +120,6 @@ type ExportOptions struct {
 	SkipMissing  bool
 	DryRun       bool
 	Timeout      time.Duration
+	ProgressOut  io.Writer
 	Runner       Runner
 }

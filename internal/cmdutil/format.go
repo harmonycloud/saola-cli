@@ -47,13 +47,14 @@ func FormatAge(d time.Duration) string {
 // Truncate 将字符串截断到 max 个字符，超出时追加 "..."。
 // 返回的字符串不会超过 max 个字符。
 func Truncate(s string, max int) string {
-	if len(s) <= max {
+	runes := []rune(s)
+	if len(runes) <= max {
 		return s
 	}
 	if max <= 3 {
-		return s[:max]
+		return string(runes[:max])
 	}
-	return s[:max-3] + "..."
+	return string(runes[:max-3]) + "..."
 }
 
 // FormatLabelsShort returns a compact label summary for table display.

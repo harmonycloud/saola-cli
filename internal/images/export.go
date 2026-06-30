@@ -20,6 +20,7 @@ import (
 	"archive/tar"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -59,7 +60,7 @@ func ExportPackage(ctx context.Context, opts ExportOptions) (*ExportResult, erro
 		return nil, fmt.Errorf("at least one --repository is required")
 	}
 	if opts.Timeout <= 0 {
-		opts.Timeout = 30 * time.Second
+		opts.Timeout = DefaultProbeTimeout
 	}
 	if opts.Platform == "" {
 		opts.Platform = "all"
@@ -88,7 +89,7 @@ func ExportPackage(ctx context.Context, opts ExportOptions) (*ExportResult, erro
 		return nil, err
 	}
 	if len(missing) > 0 && !opts.SkipMissing {
-		return nil, fmt.Errorf("%d images could not be resolved; use --skip-missing to export available images", len(missing))
+		return nil, fmt.Errorf("%s; use --skip-missing to export available images", formatMissingImagesError(missing))
 	}
 	if len(resolved) == 0 {
 		return nil, fmt.Errorf("no images resolved")
@@ -133,6 +134,7 @@ func resolveImages(ctx context.Context, runner Runner, groups []ImageGroup, opts
 	for _, group := range groups {
 		var hit *ImageCandidate
 		inspected := map[string]bool{}
+		var probeErrors []ProbeError
 		for _, candidate := range group.Candidates {
 			if inspected[candidate.Image] {
 				continue
@@ -140,6 +142,14 @@ func resolveImages(ctx context.Context, runner Runner, groups []ImageGroup, opts
 			inspected[candidate.Image] = true
 			ok, err := inspectImage(ctx, runner, candidate.Image, opts)
 			if err != nil {
+				probeErrors = append(probeErrors, ProbeError{
+					Image:      candidate.Image,
+					Repository: candidate.Repository,
+					File:       candidate.File,
+					Field:      candidate.Field,
+					Reason:     classifyProbeError(err),
+					Message:    err.Error(),
+				})
 				continue
 			}
 			if ok {
@@ -150,8 +160,9 @@ func resolveImages(ctx context.Context, runner Runner, groups []ImageGroup, opts
 		}
 		if hit == nil {
 			missing = append(missing, MissingImage{
-				Name:       group.Name,
-				Candidates: group.Candidates,
+				Name:        group.Name,
+				Candidates:  group.Candidates,
+				ProbeErrors: probeErrors,
 			})
 			continue
 		}
@@ -168,31 +179,71 @@ func resolveImages(ctx context.Context, runner Runner, groups []ImageGroup, opts
 	return resolved, missing, nil
 }
 
-func inspectImage(ctx context.Context, runner Runner, image string, opts ExportOptions) (bool, error) {
-	runCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
-	defer cancel()
+func formatMissingImagesError(missing []MissingImage) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d images could not be resolved", len(missing))
+	for _, item := range missing {
+		fmt.Fprintf(&b, "; image=%s", item.Name)
+		for _, probe := range item.ProbeErrors {
+			fmt.Fprintf(&b, " candidate=%s", probe.Image)
+			if probe.File != "" {
+				fmt.Fprintf(&b, " file=%s", probe.File)
+			}
+			if probe.Field != "" {
+				fmt.Fprintf(&b, " field=%s", probe.Field)
+			}
+			if probe.Reason != "" {
+				fmt.Fprintf(&b, " reason=%s", probe.Reason)
+			}
+			if probe.Message != "" {
+				fmt.Fprintf(&b, " message=%s", probe.Message)
+			}
+		}
+	}
+	return b.String()
+}
 
+func classifyProbeError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "x509") || strings.Contains(msg, "certificate signed by unknown authority") || strings.Contains(msg, "tls"):
+		return "RegistryTLS"
+	case strings.Contains(msg, "unauthorized") || strings.Contains(msg, "authentication required") || strings.Contains(msg, "denied"):
+		return "RegistryAuth"
+	case strings.Contains(msg, "manifest unknown") || strings.Contains(msg, "name unknown") || strings.Contains(msg, "not found"):
+		return "ManifestNotFound"
+	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline exceeded"):
+		return "Timeout"
+	default:
+		return "InspectFailed"
+	}
+}
+
+func inspectImage(ctx context.Context, runner Runner, image string, opts ExportOptions) (bool, error) {
 	if _, err := runner.LookPath(toolSkopeo); err == nil {
 		args := []string{"inspect", "--raw"}
 		if opts.Insecure {
 			args = append(args, "--tls-verify=false")
 		}
 		args = append(args, "docker://"+image)
-		if err = runner.Run(runCtx, toolSkopeo, args...); err != nil {
+		if err = runWithTimeout(ctx, runner, opts.Timeout, toolSkopeo, args...); err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 
 	if _, err := runner.LookPath(toolDocker); err == nil {
-		if err = runner.Run(runCtx, toolDocker, "manifest", "inspect", image); err != nil {
+		if err = runWithTimeout(ctx, runner, opts.Timeout, toolDocker, "manifest", "inspect", image); err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 
 	if _, err := runner.LookPath(toolNerdctl); err == nil {
-		if err = runner.Run(runCtx, toolNerdctl, "image", "inspect", image); err != nil {
+		if err = runWithTimeout(ctx, runner, opts.Timeout, toolNerdctl, "image", "inspect", image); err != nil {
 			return false, err
 		}
 		return true, nil
@@ -218,68 +269,161 @@ func exportWithSkopeo(ctx context.Context, runner Runner, images []ResolvedImage
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		_ = os.RemoveAll(tmpDir)
+	}()
 
 	ociDir := filepath.Join(tmpDir, "images")
-	for _, item := range images {
-		runCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	progressOut := progressOutput(opts)
+	for i, item := range images {
+		printImageProgress(progressOut, i, len(images), "exporting", item.Image)
 		args := []string{"copy"}
 		if opts.MultiArch && opts.Platform == "all" {
 			args = append(args, "--all")
 		} else if opts.Platform != "" && opts.Platform != "all" {
-			args = append(args, "--override-platform", opts.Platform)
+			platformArgs, platformErr := skopeoPlatformArgs(opts.Platform)
+			if platformErr != nil {
+				return platformErr
+			}
+			args = append(args, platformArgs...)
 		}
 		if opts.Insecure {
 			args = append(args, "--src-tls-verify=false")
 		}
 		args = append(args, "docker://"+item.Image, "oci:"+ociDir+":"+safeOCITag(item.Name))
-		err = runner.Run(runCtx, toolSkopeo, args...)
-		cancel()
-		if err != nil {
+		if err = runStreaming(ctx, runner, progressOut, progressOut, toolSkopeo, args...); err != nil {
 			return fmt.Errorf("export %s with skopeo: %w", item.Image, err)
 		}
+		printImageProgress(progressOut, i+1, len(images), "exported", item.Image)
 	}
+	fmt.Fprintf(progressOut, "Packing image archive -> %s\n", output)
 	return tarDirectory(output, tmpDir)
 }
 
 func exportWithDocker(ctx context.Context, runner Runner, images []ResolvedImage, output string, opts ExportOptions) error {
 	imageNames := make([]string, 0, len(images))
-	for _, item := range images {
-		runCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	progressOut := progressOutput(opts)
+	for i, item := range images {
+		printImageProgress(progressOut, i, len(images), "pulling", item.Image)
 		args := []string{"pull"}
 		if opts.Platform != "" && opts.Platform != "all" {
 			args = append(args, "--platform", opts.Platform)
 		}
 		args = append(args, item.Image)
-		err := runner.Run(runCtx, toolDocker, args...)
-		cancel()
-		if err != nil {
+		if err := runStreaming(ctx, runner, progressOut, progressOut, toolDocker, args...); err != nil {
 			return fmt.Errorf("pull %s with docker: %w", item.Image, err)
 		}
+		printImageProgress(progressOut, i+1, len(images), "pulled", item.Image)
 		imageNames = append(imageNames, item.Image)
 	}
+	fmt.Fprintf(progressOut, "Packing image archive -> %s\n", output)
 	args := append([]string{"save", "-o", output}, imageNames...)
-	return runner.Run(ctx, toolDocker, args...)
+	return runStreaming(ctx, runner, progressOut, progressOut, toolDocker, args...)
 }
 
 func exportWithNerdctl(ctx context.Context, runner Runner, images []ResolvedImage, output string, opts ExportOptions) error {
 	imageNames := make([]string, 0, len(images))
-	for _, item := range images {
-		runCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	progressOut := progressOutput(opts)
+	for i, item := range images {
+		printImageProgress(progressOut, i, len(images), "pulling", item.Image)
 		args := []string{"pull"}
 		if opts.Platform != "" && opts.Platform != "all" {
 			args = append(args, "--platform", opts.Platform)
 		}
 		args = append(args, item.Image)
-		err := runner.Run(runCtx, toolNerdctl, args...)
-		cancel()
-		if err != nil {
+		if err := runStreaming(ctx, runner, progressOut, progressOut, toolNerdctl, args...); err != nil {
 			return fmt.Errorf("pull %s with nerdctl: %w", item.Image, err)
 		}
+		printImageProgress(progressOut, i+1, len(images), "pulled", item.Image)
 		imageNames = append(imageNames, item.Image)
 	}
+	fmt.Fprintf(progressOut, "Packing image archive -> %s\n", output)
 	args := append([]string{"save", "-o", output}, imageNames...)
-	return runner.Run(ctx, toolNerdctl, args...)
+	return runStreaming(ctx, runner, progressOut, progressOut, toolNerdctl, args...)
+}
+
+func runWithTimeout(ctx context.Context, runner Runner, timeout time.Duration, name string, args ...string) error {
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	err := runner.Run(runCtx, name, args...)
+	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("timed out after %s", timeout)
+	}
+	return err
+}
+
+type streamingRunner interface {
+	RunStreaming(ctx context.Context, stdout io.Writer, stderr io.Writer, name string, args ...string) error
+}
+
+func runStreaming(ctx context.Context, runner Runner, stdout io.Writer, stderr io.Writer, name string, args ...string) error {
+	if stderr == nil {
+		stderr = io.Discard
+	}
+	start := time.Now()
+	done := make(chan error, 1)
+	go func() {
+		if stream, ok := runner.(streamingRunner); ok {
+			done <- stream.RunStreaming(ctx, stdout, stderr, name, args...)
+			return
+		}
+		done <- runner.Run(ctx, name, args...)
+	}()
+
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case err := <-done:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			fmt.Fprintf(stderr, "Still running %s %s (%s elapsed)\n", name, commandAction(args), time.Since(start).Round(time.Second))
+		}
+	}
+}
+
+func progressOutput(opts ExportOptions) io.Writer {
+	if opts.ProgressOut != nil {
+		return opts.ProgressOut
+	}
+	return io.Discard
+}
+
+func commandAction(args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
+	return args[0]
+}
+
+func printImageProgress(out io.Writer, done int, total int, action string, image string) {
+	if out == nil || total <= 0 {
+		return
+	}
+	width := 20
+	filled := done * width / total
+	if filled > width {
+		filled = width
+	}
+	bar := strings.Repeat("=", filled) + strings.Repeat(".", width-filled)
+	fmt.Fprintf(out, "[%s] %d/%d %s %s\n", bar, done, total, action, image)
+}
+
+func skopeoPlatformArgs(platform string) ([]string, error) {
+	if platform == "" || platform == "all" {
+		return nil, nil
+	}
+	parts := strings.Split(platform, "/")
+	if len(parts) < 2 || len(parts) > 3 || parts[0] == "" || parts[1] == "" || (len(parts) == 3 && parts[2] == "") {
+		return nil, fmt.Errorf("invalid platform %q, expected os/arch[/variant] or all", platform)
+	}
+	args := []string{"--override-os", parts[0], "--override-arch", parts[1]}
+	if len(parts) == 3 {
+		args = append(args, "--override-variant", parts[2])
+	}
+	return args, nil
 }
 
 func buildLock(meta PackageMetadata, repos []string, resolved []ResolvedImage, missing []MissingImage) LockFile {
@@ -306,7 +450,7 @@ func writeLockFile(path string, lock LockFile) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func tarDirectory(output, dir string) error {
+func tarDirectory(output, dir string) (err error) {
 	if parent := filepath.Dir(output); parent != "." {
 		if err := os.MkdirAll(parent, 0o755); err != nil {
 			return err
@@ -316,12 +460,20 @@ func tarDirectory(output, dir string) error {
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func() {
+		if closeErr := out.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 
 	tw := tar.NewWriter(out)
-	defer tw.Close()
+	defer func() {
+		if closeErr := tw.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 
-	return filepath.WalkDir(dir, func(path string, entry os.DirEntry, walkErr error) error {
+	err = filepath.WalkDir(dir, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -355,6 +507,7 @@ func tarDirectory(output, dir string) error {
 		}
 		return closeErr
 	})
+	return err
 }
 
 func safeOCITag(name string) string {

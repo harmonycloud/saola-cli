@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -31,6 +32,12 @@ import (
 )
 
 var embeddedImageLineRE = regexp.MustCompile(`(?m)^\s*([A-Za-z0-9_.-]*[Ii]mage[A-Za-z0-9_.-]*)\s*:\s*["']?([^"'\s]+)["']?`)
+
+type packageYAMLFile struct {
+	Rel      string
+	Data     []byte
+	Document int
+}
 
 // DiscoverPackageImages scans a package directory and returns logical image groups.
 //
@@ -51,7 +58,8 @@ func DiscoverPackageImages(pkgDir string, repositories []string) (PackageMetadat
 		return PackageMetadata{}, nil, err
 	}
 
-	groups := make(map[string]*ImageGroup)
+	yamlFiles := make([]packageYAMLFile, 0, len(files))
+	configurations := map[string]packageYAMLFile{}
 	for _, file := range files {
 		rel, relErr := filepath.Rel(pkgDir, file)
 		if relErr != nil {
@@ -65,8 +73,23 @@ func DiscoverPackageImages(pkgDir string, repositories []string) (PackageMetadat
 		if readErr != nil {
 			return PackageMetadata{}, nil, fmt.Errorf("read %s: %w", rel, readErr)
 		}
+		docs, splitErr := yamlDocuments(rel, data)
+		if splitErr != nil {
+			return PackageMetadata{}, nil, splitErr
+		}
+		yamlFiles = append(yamlFiles, docs...)
+		if strings.HasPrefix(rel, "configurations/") {
+			for _, item := range docs {
+				if name := metadataName(item.Data); name != "" {
+					configurations[name] = item
+				}
+			}
+		}
+	}
 
-		defaults, globe, parseErr := templateDefaults(data)
+	groups := make(map[string]*ImageGroup)
+	for _, file := range yamlFiles {
+		defaults, globe, parseErr := templateDefaults(file.Data)
 		if parseErr != nil {
 			// Keep scanning with safe defaults; some package files contain non-K8s YAML fragments.
 			defaults = map[string]any{}
@@ -75,16 +98,8 @@ func DiscoverPackageImages(pkgDir string, repositories []string) (PackageMetadat
 		for _, version := range versions {
 			for _, repo := range repositories {
 				values := buildTemplateValues(meta, defaults, globe, version, repo)
-				candidates := scanYAMLImages(data, rel, version, repo, repositories, values)
-				for _, candidate := range candidates {
-					key := logicalImageName(candidate.Image, repositories)
-					group := groups[key]
-					if group == nil {
-						group = &ImageGroup{Name: key}
-						groups[key] = group
-					}
-					group.Candidates = appendUniqueCandidate(group.Candidates, candidate)
-				}
+				appendCandidates(groups, repositories, scanYAMLImages(file.Data, file.Rel, version, repo, repositories, values))
+				appendCandidates(groups, repositories, scanReferencedConfigurationImages(file.Data, version, repo, repositories, values, configurations))
 			}
 		}
 	}
@@ -111,6 +126,18 @@ func DiscoverPackageImages(pkgDir string, repositories []string) (PackageMetadat
 		return result[i].Name < result[j].Name
 	})
 	return meta, result, nil
+}
+
+func appendCandidates(groups map[string]*ImageGroup, repositories []string, candidates []ImageCandidate) {
+	for _, candidate := range candidates {
+		key := logicalImageName(candidate.Image, repositories)
+		group := groups[key]
+		if group == nil {
+			group = &ImageGroup{Name: key}
+			groups[key] = group
+		}
+		group.Candidates = appendUniqueCandidate(group.Candidates, candidate)
+	}
 }
 
 func readMetadata(pkgDir string) (PackageMetadata, error) {
@@ -151,6 +178,150 @@ func yamlFiles(root string) ([]string, error) {
 	})
 	sort.Strings(files)
 	return files, err
+}
+
+func yamlDocuments(rel string, data []byte) ([]packageYAMLFile, error) {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	var docs []packageYAMLFile
+	for docIndex := 1; ; docIndex++ {
+		var node yaml.Node
+		err := decoder.Decode(&node)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("parse %s document %d: %w", rel, docIndex, err)
+		}
+		if emptyYAMLDocument(&node) {
+			continue
+		}
+		docData, err := yaml.Marshal(&node)
+		if err != nil {
+			return nil, fmt.Errorf("encode %s document %d: %w", rel, docIndex, err)
+		}
+		docs = append(docs, packageYAMLFile{
+			Rel:      rel,
+			Data:     docData,
+			Document: docIndex,
+		})
+	}
+	return docs, nil
+}
+
+func emptyYAMLDocument(node *yaml.Node) bool {
+	if node == nil || node.Kind == 0 {
+		return true
+	}
+	if node.Kind == yaml.DocumentNode {
+		if len(node.Content) == 0 {
+			return true
+		}
+		return emptyYAMLDocument(node.Content[0])
+	}
+	return node.Kind == yaml.ScalarNode && node.Value == ""
+}
+
+func metadataName(data []byte) string {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	for {
+		var node yaml.Node
+		err := decoder.Decode(&node)
+		if err != nil {
+			break
+		}
+		metadata := mappingChild(&node, "metadata")
+		name := mappingChild(metadata, "name")
+		if name != nil && name.Kind == yaml.ScalarNode {
+			return name.Value
+		}
+	}
+	return ""
+}
+
+type configurationRef struct {
+	Name   string
+	Values map[string]any
+}
+
+func scanReferencedConfigurationImages(baselineData []byte, version, repo string, repositories []string, values templateValues, configurations map[string]packageYAMLFile) []ImageCandidate {
+	var candidates []ImageCandidate
+	for _, ref := range configurationRefs(baselineData, values) {
+		config, ok := configurations[ref.Name]
+		if !ok {
+			continue
+		}
+		configValues := values
+		configValues.Values = ref.Values
+		candidates = append(candidates, scanYAMLImages(config.Data, config.Rel, version, repo, repositories, configValues)...)
+	}
+	return candidates
+}
+
+func configurationRefs(data []byte, values templateValues) []configurationRef {
+	var refs []configurationRef
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	for {
+		var node yaml.Node
+		err := decoder.Decode(&node)
+		if err != nil {
+			break
+		}
+		spec := mappingChild(&node, "spec")
+		configs := mappingChild(spec, "configurations")
+		if configs == nil || configs.Kind != yaml.SequenceNode {
+			continue
+		}
+		for _, item := range configs.Content {
+			name := mappingScalar(item, "name")
+			if name == "" {
+				continue
+			}
+			ref := configurationRef{
+				Name:   name,
+				Values: map[string]any{},
+			}
+			if valuesNode := mappingChild(item, "values"); valuesNode != nil {
+				if rendered, ok := renderValuesNode(valuesNode, values).(map[string]any); ok {
+					ref.Values = rendered
+				}
+			}
+			refs = append(refs, ref)
+		}
+	}
+	return refs
+}
+
+func renderValuesNode(node *yaml.Node, values templateValues) any {
+	if node == nil {
+		return nil
+	}
+	switch node.Kind {
+	case yaml.DocumentNode:
+		if len(node.Content) == 0 {
+			return nil
+		}
+		return renderValuesNode(node.Content[0], values)
+	case yaml.MappingNode:
+		out := map[string]any{}
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			out[node.Content[i].Value] = renderValuesNode(node.Content[i+1], values)
+		}
+		return out
+	case yaml.SequenceNode:
+		out := make([]any, 0, len(node.Content))
+		for _, item := range node.Content {
+			out = append(out, renderValuesNode(item, values))
+		}
+		return out
+	case yaml.ScalarNode:
+		rendered, err := renderImageTemplate(node.Value, values)
+		if err != nil {
+			return node.Value
+		}
+		return rendered
+	default:
+		return nil
+	}
 }
 
 func scanYAMLImages(data []byte, file, version, repo string, repositories []string, values templateValues) []ImageCandidate {
@@ -316,6 +487,14 @@ func mappingChild(node *yaml.Node, key string) *yaml.Node {
 		}
 	}
 	return nil
+}
+
+func mappingScalar(node *yaml.Node, key string) string {
+	child := mappingChild(node, key)
+	if child == nil || child.Kind != yaml.ScalarNode {
+		return ""
+	}
+	return child.Value
 }
 
 func defaultsFromNode(node *yaml.Node) map[string]any {
