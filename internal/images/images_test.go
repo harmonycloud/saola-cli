@@ -64,6 +64,10 @@ func TestDiscoverPackageImages_ExpandsMultipleRepositories(t *testing.T) {
 		"repo-a.example:5000/middleware/redis-exporter:v8.2.6",
 		"repo-b.example:5000/middleware/redis-exporter:v8.2.6",
 	})
+	assertCandidateImages(t, groups, "redis-audit:v1.0.0", []string{
+		"repo-a.example:5000/middleware/redis-audit:v1.0.0",
+		"repo-b.example:5000/middleware/redis-audit:v1.0.0",
+	})
 }
 
 func TestExportPackage_DryRunBuildsLock(t *testing.T) {
@@ -264,6 +268,79 @@ func TestExportWithSkopeo_UsesPlatformOverrideParts(t *testing.T) {
 	}
 }
 
+func TestExportImages_FormatDockerUsesDockerArchive(t *testing.T) {
+	t.Parallel()
+	runner := &fakeRunner{tools: map[string]bool{toolSkopeo: true, toolDocker: true}}
+
+	err := exportImages(context.Background(), runner, []ResolvedImage{{
+		Name:  "redis:v1.0.0",
+		Image: "repo.example/middleware/redis:v1.0.0",
+	}}, filepath.Join(t.TempDir(), "images.tar"), ExportOptions{
+		Format:   ExportFormatDocker,
+		Platform: "linux/amd64",
+	})
+	if err != nil {
+		t.Fatalf("exportImages: %v", err)
+	}
+	if len(runner.runs) != 2 {
+		t.Fatalf("expected docker pull and save, got %#v", runner.runs)
+	}
+	if runner.runs[0].name != toolDocker || runner.runs[0].args[0] != "pull" {
+		t.Fatalf("expected docker pull, got %#v", runner.runs[0])
+	}
+	if runner.runs[1].name != toolDocker || runner.runs[1].args[0] != "save" {
+		t.Fatalf("expected docker save, got %#v", runner.runs[1])
+	}
+}
+
+func TestExportImages_FormatDockerFallsBackToNerdctl(t *testing.T) {
+	t.Parallel()
+	runner := &fakeRunner{tools: map[string]bool{toolNerdctl: true}}
+
+	err := exportImages(context.Background(), runner, []ResolvedImage{{
+		Name:  "redis:v1.0.0",
+		Image: "repo.example/middleware/redis:v1.0.0",
+	}}, filepath.Join(t.TempDir(), "images.tar"), ExportOptions{Format: ExportFormatDocker})
+	if err != nil {
+		t.Fatalf("exportImages: %v", err)
+	}
+	if len(runner.runs) != 2 {
+		t.Fatalf("expected nerdctl pull and save, got %#v", runner.runs)
+	}
+	if runner.runs[0].name != toolNerdctl || runner.runs[0].args[0] != "pull" {
+		t.Fatalf("expected nerdctl pull, got %#v", runner.runs[0])
+	}
+	if runner.runs[1].name != toolNerdctl || runner.runs[1].args[0] != "save" {
+		t.Fatalf("expected nerdctl save, got %#v", runner.runs[1])
+	}
+}
+
+func TestExportImages_FormatSkopeoRequiresSkopeo(t *testing.T) {
+	t.Parallel()
+	runner := &fakeRunner{tools: map[string]bool{toolDocker: true}}
+
+	err := exportImages(context.Background(), runner, []ResolvedImage{{
+		Name:  "redis:v1.0.0",
+		Image: "repo.example/middleware/redis:v1.0.0",
+	}}, filepath.Join(t.TempDir(), "images.tar"), ExportOptions{Format: ExportFormatSkopeo})
+	if err == nil || !strings.Contains(err.Error(), "skopeo") {
+		t.Fatalf("expected skopeo-required error, got %v", err)
+	}
+}
+
+func TestExportImages_RejectsUnknownFormat(t *testing.T) {
+	t.Parallel()
+	runner := &fakeRunner{tools: map[string]bool{toolSkopeo: true}}
+
+	err := exportImages(context.Background(), runner, []ResolvedImage{{
+		Name:  "redis:v1.0.0",
+		Image: "repo.example/middleware/redis:v1.0.0",
+	}}, filepath.Join(t.TempDir(), "images.tar"), ExportOptions{Format: "oci"})
+	if err == nil || !strings.Contains(err.Error(), "unsupported image export format") {
+		t.Fatalf("expected unsupported format error, got %v", err)
+	}
+}
+
 func TestSkopeoPlatformArgsRejectsInvalidPlatform(t *testing.T) {
 	t.Parallel()
 	if _, err := skopeoPlatformArgs("linux"); err == nil {
@@ -309,6 +386,12 @@ spec:
       values:
         repository: "{{ .Necessary.repository }}"
         tag: "{{ .Necessary.version }}"
+    - name: redis-audit
+      values:
+        repository: "{{ .Necessary.repository }}"
+        tag: "v1.0.0"
+        labels:
+          app: redis-audit
 `)
 	writeFile(t, filepath.Join(dir, "configurations", "redis-dashboard.yaml"), `apiVersion: middleware.harmonycloud.cn/v1
 kind: MiddlewareConfiguration
@@ -339,6 +422,26 @@ spec:
           containers:
             - name: exporter
               image: "{{ $repo }}/redis-exporter:v{{ $tag }}"
+`)
+	writeFile(t, filepath.Join(dir, "configurations", "redis-audit.yaml"), `apiVersion: middleware.harmonycloud.cn/v1
+kind: MiddlewareConfiguration
+metadata:
+  name: redis-audit
+spec:
+  template: |-
+    {{- $_ := required "repository is required" .Values.repository }}
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: redis-audit
+      labels:
+        {{- toYaml .Values.labels | nindent 4 }}
+    spec:
+      template:
+        spec:
+          containers:
+            - name: audit
+              image: "{{ .Values.repository }}/redis-audit:{{ .Values.tag }}"
 `)
 	return dir
 }

@@ -40,6 +40,7 @@ type ExportOptions struct {
 	Output       string
 	LockFile     string
 	Repositories []string
+	Format       string
 	Platform     string
 	MultiArch    bool
 	Insecure     bool
@@ -74,6 +75,7 @@ func NewCmdImages(cfg *config.Config) *cobra.Command {
 func NewCmdExport(cfg *config.Config) *cobra.Command {
 	o := &ExportOptions{
 		Config:    cfg,
+		Format:    imageexport.ExportFormatSkopeo,
 		Platform:  "all",
 		MultiArch: true,
 		Timeout:   imageexport.DefaultProbeTimeout,
@@ -90,6 +92,7 @@ func NewCmdExport(cfg *config.Config) *cobra.Command {
 		),
 		Example: `  saola images export ./redis -r 10.10.101.172:443/middleware -r 10.10.102.124:443/middleware
   saola images export ./redis -r 10.10.101.172:443/middleware,10.10.102.124:443/middleware -o redis-images.tar
+  saola images export ./redis -r 10.10.101.172:443/middleware --format docker -o redis-images-docker.tar
   saola images export ./redis -r 10.10.101.172:443/middleware --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -103,7 +106,8 @@ func NewCmdExport(cfg *config.Config) *cobra.Command {
 	cmd.Flags().StringArrayVarP(&o.Repositories, "repository", "r", nil, lang.T("候选镜像仓库，可重复声明或用逗号分隔", "Candidate image repository; repeat or comma-separate values"))
 	cmd.Flags().StringVarP(&o.Output, "output", "o", "", lang.T("输出镜像归档路径（默认：<name>-<version>-images.tar）", "Output image archive path (default: <name>-<version>-images.tar)"))
 	cmd.Flags().StringVar(&o.LockFile, "lock-file", "", lang.T("输出镜像锁定清单路径（默认：<output>.lock.json）", "Output image lock file path (default: <output>.lock.json)"))
-	cmd.Flags().StringVar(&o.Platform, "platform", "all", lang.T("导出平台，例如 linux/amd64；all 表示保留多架构", "Export platform, for example linux/amd64; all keeps multi-arch images"))
+	cmd.Flags().StringVar(&o.Format, "format", imageexport.ExportFormatSkopeo, lang.T("导出格式：skopeo 为 OCI layout，docker 为 docker/nerdctl load 归档", "Export format: skopeo for OCI layout, docker for docker/nerdctl load archive"))
+	cmd.Flags().StringVar(&o.Platform, "platform", "all", lang.T("导出平台，例如 linux/amd64；skopeo 格式下 all 表示保留多架构", "Export platform, for example linux/amd64; all keeps multi-arch images with skopeo format"))
 	cmd.Flags().BoolVar(&o.MultiArch, "multi-arch", true, lang.T("使用 skopeo 导出时保留多架构清单", "Keep multi-arch manifests when exporting with skopeo"))
 	cmd.Flags().BoolVar(&o.Insecure, "insecure", false, lang.T("跳过镜像仓库 TLS 校验", "Skip registry TLS verification"))
 	cmd.Flags().BoolVar(&o.SkipMissing, "skip-missing", false, lang.T("存在无法解析的镜像时仍导出已命中的镜像", "Export resolved images even when some images are missing"))
@@ -130,6 +134,7 @@ func (o *ExportOptions) Run(ctx context.Context) error {
 		Output:       o.Output,
 		LockFile:     o.LockFile,
 		Repositories: o.Repositories,
+		Format:       o.Format,
 		Platform:     o.Platform,
 		MultiArch:    o.MultiArch,
 		Insecure:     o.Insecure,

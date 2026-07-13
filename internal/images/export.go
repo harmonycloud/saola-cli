@@ -35,6 +35,13 @@ const (
 	toolNerdctl = "nerdctl"
 )
 
+const (
+	// ExportFormatSkopeo exports a skopeo OCI layout archive for registry-to-registry import.
+	ExportFormatSkopeo = "skopeo"
+	// ExportFormatDocker exports a Docker archive that can be loaded by docker or nerdctl.
+	ExportFormatDocker = "docker"
+)
+
 // ExportResult contains the resolved images and generated lock file.
 //
 // ExportResult 保存解析后的镜像和生成的锁定清单。
@@ -64,6 +71,10 @@ func ExportPackage(ctx context.Context, opts ExportOptions) (*ExportResult, erro
 	}
 	if opts.Platform == "" {
 		opts.Platform = "all"
+	}
+	opts.Format = normalizeExportFormat(opts.Format)
+	if opts.Format != ExportFormatSkopeo && opts.Format != ExportFormatDocker {
+		return nil, fmt.Errorf("unsupported image export format %q (supported: %s, %s)", opts.Format, ExportFormatSkopeo, ExportFormatDocker)
 	}
 
 	meta, groups, err := DiscoverPackageImages(opts.PkgDir, opts.Repositories)
@@ -252,16 +263,31 @@ func inspectImage(ctx context.Context, runner Runner, image string, opts ExportO
 }
 
 func exportImages(ctx context.Context, runner Runner, images []ResolvedImage, output string, opts ExportOptions) error {
-	if _, err := runner.LookPath(toolSkopeo); err == nil {
+	switch normalizeExportFormat(opts.Format) {
+	case ExportFormatSkopeo:
+		if _, err := runner.LookPath(toolSkopeo); err != nil {
+			return fmt.Errorf("--format=%s requires skopeo", ExportFormatSkopeo)
+		}
 		return exportWithSkopeo(ctx, runner, images, output, opts)
+	case ExportFormatDocker:
+		if _, err := runner.LookPath(toolDocker); err == nil {
+			return exportWithDocker(ctx, runner, images, output, opts)
+		}
+		if _, err := runner.LookPath(toolNerdctl); err == nil {
+			return exportWithNerdctl(ctx, runner, images, output, opts)
+		}
+		return fmt.Errorf("--format=%s requires docker or nerdctl", ExportFormatDocker)
+	default:
+		return fmt.Errorf("unsupported image export format %q (supported: %s, %s)", opts.Format, ExportFormatSkopeo, ExportFormatDocker)
 	}
-	if _, err := runner.LookPath(toolDocker); err == nil {
-		return exportWithDocker(ctx, runner, images, output, opts)
+}
+
+func normalizeExportFormat(format string) string {
+	format = strings.ToLower(strings.TrimSpace(format))
+	if format == "" {
+		return ExportFormatSkopeo
 	}
-	if _, err := runner.LookPath(toolNerdctl); err == nil {
-		return exportWithNerdctl(ctx, runner, images, output, opts)
-	}
-	return fmt.Errorf("no image export tool found; install skopeo, docker, or nerdctl")
+	return format
 }
 
 func exportWithSkopeo(ctx context.Context, runner Runner, images []ResolvedImage, output string, opts ExportOptions) error {
