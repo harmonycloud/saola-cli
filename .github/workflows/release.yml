@@ -1,0 +1,292 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saola-cli-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test release metadata contract
+        run: bash hack/release-metadata_test.sh
+      - name: Test Go packages
+        run: make test
+
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.metadata.outputs.channel }}
+      version: ${{ steps.metadata.outputs.version }}
+      commit: ${{ steps.metadata.outputs.commit }}
+      build_date: ${{ steps.metadata.outputs.build_date }}
+      source_date_epoch: ${{ steps.metadata.outputs.source_date_epoch }}
+      event_type: ${{ steps.metadata.outputs.event_type }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: Derive immutable metadata
+        id: metadata
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+          GIT_REF: ${{ github.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_COMMIT}"
+          source_date_epoch="$(git show -s --format=%ct "${EXPECTED_COMMIT}")"
+          metadata="$(SOURCE_DATE_EPOCH="${source_date_epoch}" ./hack/release-metadata.sh "${GIT_REF}" "${EXPECTED_COMMIT}" "${REPOSITORY}")"
+          printf '%s\n' "${metadata}" >> "${GITHUB_OUTPUT}"
+          printf 'source_date_epoch=%s\n' "${source_date_epoch}" >> "${GITHUB_OUTPUT}"
+          channel="$(printf '%s\n' "${metadata}" | sed -n 's/^channel=//p')"
+          case "${channel}" in
+            dev) event_type=saola-cli-dev ;;
+            stable) event_type=saola-cli-stable ;;
+            *) echo "unsupported release channel: ${channel}" >&2; exit 1 ;;
+          esac
+          printf 'event_type=%s\n' "${event_type}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: [test, metadata]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      attestations: write
+      contents: write
+      id-token: write
+    env:
+      VERSION: ${{ needs.metadata.outputs.version }}
+      GIT_COMMIT: ${{ needs.metadata.outputs.commit }}
+      BUILD_DATE: ${{ needs.metadata.outputs.build_date }}
+      SOURCE_DATE_EPOCH: ${{ needs.metadata.outputs.source_date_epoch }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: Validate dispatch credential
+        env:
+          OPENSAOLA_DISPATCH_TOKEN: ${{ secrets.OPENSAOLA_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${OPENSAOLA_DISPATCH_TOKEN}" || {
+            echo "OPENSAOLA_DISPATCH_TOKEN is required" >&2
+            exit 1
+          }
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build official architectures
+        run: make release-build
+      - name: Inspect release binaries
+        run: |
+          set -euo pipefail
+          file dist/saola-linux-amd64 dist/saola-linux-arm64
+          file dist/saola-linux-amd64 | grep -q 'x86-64'
+          file dist/saola-linux-arm64 | grep -Eq 'ARM aarch64|aarch64'
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        with:
+          platforms: arm64
+      - name: Smoke-test both architectures
+        run: |
+          set -euo pipefail
+          amd64_output="$(dist/saola-linux-amd64 version)"
+          arm64_output="$(dist/saola-linux-arm64 version)"
+          printf '%s\n' "${amd64_output}"
+          printf '%s\n' "${arm64_output}"
+          grep -Fq "Version: ${VERSION}" <<<"${amd64_output}"
+          grep -Fq "Git Commit: ${GIT_COMMIT}" <<<"${amd64_output}"
+          grep -Fq "Version: ${VERSION}" <<<"${arm64_output}"
+          grep -Fq "Git Commit: ${GIT_COMMIT}" <<<"${arm64_output}"
+      - name: Create checksums
+        run: make release-checksums
+      - name: Generate amd64 SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          file: dist/saola-linux-amd64
+          format: spdx-json
+          output-file: dist/saola-linux-amd64.spdx.json
+          artifact-name: saola-linux-amd64.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Generate arm64 SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          file: dist/saola-linux-arm64
+          format: spdx-json
+          output-file: dist/saola-linux-arm64.spdx.json
+          artifact-name: saola-linux-arm64.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
+        with:
+          subject-path: |
+            dist/saola-linux-amd64
+            dist/saola-linux-arm64
+            dist/SHA256SUMS
+            dist/saola-linux-amd64.spdx.json
+            dist/saola-linux-arm64.spdx.json
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Keyless-sign release artifacts
+        run: |
+          set -euo pipefail
+          for artifact in \
+            dist/saola-linux-amd64 \
+            dist/saola-linux-arm64 \
+            dist/SHA256SUMS \
+            dist/saola-linux-amd64.spdx.json \
+            dist/saola-linux-arm64.spdx.json; do
+            cosign sign-blob --yes --bundle "${artifact}.sigstore.json" "${artifact}"
+          done
+      - name: Upload immutable workflow artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: saola-cli-${{ needs.metadata.outputs.version }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish stable tag assets
+        if: needs.metadata.outputs.channel == 'stable'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          release_created=false
+          if ! release_json="$(gh release view "${RELEASE_TAG}" --json isDraft,assets 2>/dev/null)"; then
+            gh release create "${RELEASE_TAG}" --verify-tag --draft --generate-notes --title "Saola CLI ${RELEASE_TAG}"
+            release_created=true
+            release_json="$(gh release view "${RELEASE_TAG}" --json isDraft,assets)"
+          fi
+
+          is_draft="$(jq -r '.isDraft' <<<"${release_json}")"
+          [[ "${is_draft}" == "true" || "${is_draft}" == "false" ]] || {
+            echo "unable to determine release draft state" >&2
+            exit 1
+          }
+          mapfile -t remote_assets < <(jq -r '.assets[].name' <<<"${release_json}")
+
+          for remote_asset in "${remote_assets[@]}"; do
+            [[ "${remote_asset}" == "$(basename "${remote_asset}")" && -f "dist/${remote_asset}" ]] || {
+              echo "release contains unexpected asset: ${remote_asset}" >&2
+              exit 1
+            }
+          done
+
+          verify_dir="$(mktemp -d)"
+          trap 'rm -rf "${verify_dir}"' EXIT
+          for artifact in dist/*; do
+            asset_name="$(basename "${artifact}")"
+            asset_exists=false
+            for remote_asset in "${remote_assets[@]}"; do
+              if [[ "${remote_asset}" == "${asset_name}" ]]; then
+                asset_exists=true
+                break
+              fi
+            done
+
+            if [[ "${asset_exists}" == "false" ]]; then
+              if [[ "${is_draft}" != "true" ]]; then
+                echo "published release is missing immutable asset: ${asset_name}" >&2
+                exit 1
+              fi
+              upload_artifact="${artifact}"
+              if [[ "${asset_name}" == *.spdx.json.sigstore.json ]]; then
+                sbom_name="${asset_name%.sigstore.json}"
+                canonical_sbom="${verify_dir}/${sbom_name}/${sbom_name}"
+                if [[ -f "${canonical_sbom}" ]]; then
+                  mkdir -p "${verify_dir}/canonical-bundles"
+                  upload_artifact="${verify_dir}/canonical-bundles/${asset_name}"
+                  cosign sign-blob --yes --bundle "${upload_artifact}" "${canonical_sbom}"
+                fi
+              fi
+              gh release upload "${RELEASE_TAG}" "${upload_artifact}"
+            fi
+
+            asset_verify_dir="${verify_dir}/${asset_name}"
+            mkdir -p "${asset_verify_dir}"
+            gh release download "${RELEASE_TAG}" --pattern "${asset_name}" --dir "${asset_verify_dir}"
+            if [[ "${asset_name}" == *.sigstore.json ]]; then
+              signed_artifact="${artifact%.sigstore.json}"
+              signed_name="$(basename "${signed_artifact}")"
+              canonical_signed_artifact="${verify_dir}/${signed_name}/${signed_name}"
+              if [[ -f "${canonical_signed_artifact}" ]]; then
+                signed_artifact="${canonical_signed_artifact}"
+              fi
+              cosign verify-blob \
+                --bundle "${asset_verify_dir}/${asset_name}" \
+                --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/${RELEASE_TAG}" \
+                --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+                "${signed_artifact}"
+            elif [[ "${asset_name}" == *.spdx.json ]]; then
+              canonical_sbom="${asset_verify_dir}/${asset_name}"
+              jq -e '
+                (.spdxVersion | type == "string" and startswith("SPDX-")) and
+                (.SPDXID == "SPDXRef-DOCUMENT") and
+                (.packages | type == "array" and length > 0)
+              ' "${canonical_sbom}" >/dev/null || {
+                echo "release SBOM is not a valid SPDX document: ${asset_name}" >&2
+                exit 1
+              }
+            else
+              cmp -s "${artifact}" "${asset_verify_dir}/${asset_name}" || {
+                echo "release asset differs from local immutable artifact: ${asset_name}" >&2
+                exit 1
+              }
+            fi
+          done
+
+          if [[ "${is_draft}" == "true" ]]; then
+            gh release edit "${RELEASE_TAG}" --draft=false
+          elif [[ "${release_created}" == "true" ]]; then
+            echo "new release unexpectedly lost draft state" >&2
+            exit 1
+          fi
+      - name: Dispatch immutable OpenSaola update
+        env:
+          OPENSAOLA_DISPATCH_TOKEN: ${{ secrets.OPENSAOLA_DISPATCH_TOKEN }}
+          EVENT_TYPE: ${{ needs.metadata.outputs.event_type }}
+          RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
+          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+          RELEASE_COMMIT: ${{ needs.metadata.outputs.commit }}
+          RELEASE_EPOCH: ${{ needs.metadata.outputs.source_date_epoch }}
+        run: |
+          set -euo pipefail
+          amd64_sha="$(awk '$2 == "saola-linux-amd64" { print $1 }' dist/SHA256SUMS)"
+          arm64_sha="$(awk '$2 == "saola-linux-arm64" { print $1 }' dist/SHA256SUMS)"
+          test "${#amd64_sha}" -eq 64
+          test "${#arm64_sha}" -eq 64
+          payload="$(jq -n \
+            --arg event_type "${EVENT_TYPE}" \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg channel "${RELEASE_CHANNEL}" \
+            --arg version "${RELEASE_VERSION}" \
+            --arg commit "${RELEASE_COMMIT}" \
+            --arg source_date_epoch "${RELEASE_EPOCH}" \
+            --arg amd64_sha256 "${amd64_sha}" \
+            --arg arm64_sha256 "${arm64_sha}" \
+            '{event_type: $event_type, client_payload: {repository: $repository, channel: $channel, version: $version, commit: $commit, source_date_epoch: $source_date_epoch, checksums: {"linux/amd64": $amd64_sha256, "linux/arm64": $arm64_sha256}}}')"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${OPENSAOLA_DISPATCH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/harmonycloud/opensaola/dispatches \
+            --data "${payload}"
