@@ -34,7 +34,6 @@ jobs:
       commit: ${{ steps.metadata.outputs.commit }}
       build_date: ${{ steps.metadata.outputs.build_date }}
       source_date_epoch: ${{ steps.metadata.outputs.source_date_epoch }}
-      event_type: ${{ steps.metadata.outputs.event_type }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -52,13 +51,6 @@ jobs:
           metadata="$(SOURCE_DATE_EPOCH="${source_date_epoch}" ./hack/release-metadata.sh "${GIT_REF}" "${EXPECTED_COMMIT}" "${REPOSITORY}")"
           printf '%s\n' "${metadata}" >> "${GITHUB_OUTPUT}"
           printf 'source_date_epoch=%s\n' "${source_date_epoch}" >> "${GITHUB_OUTPUT}"
-          channel="$(printf '%s\n' "${metadata}" | sed -n 's/^channel=//p')"
-          case "${channel}" in
-            dev) event_type=saola-cli-dev ;;
-            stable) event_type=saola-cli-stable ;;
-            *) echo "unsupported release channel: ${channel}" >&2; exit 1 ;;
-          esac
-          printf 'event_type=%s\n' "${event_type}" >> "${GITHUB_OUTPUT}"
 
   build:
     needs: [test, metadata]
@@ -77,15 +69,6 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
-      - name: Validate dispatch credential
-        env:
-          OPENSAOLA_DISPATCH_TOKEN: ${{ secrets.OPENSAOLA_DISPATCH_TOKEN }}
-        run: |
-          set -euo pipefail
-          test -n "${OPENSAOLA_DISPATCH_TOKEN}" || {
-            echo "OPENSAOLA_DISPATCH_TOKEN is required" >&2
-            exit 1
-          }
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
@@ -259,34 +242,3 @@ jobs:
             echo "new release unexpectedly lost draft state" >&2
             exit 1
           fi
-      - name: Dispatch immutable OpenSaola update
-        env:
-          OPENSAOLA_DISPATCH_TOKEN: ${{ secrets.OPENSAOLA_DISPATCH_TOKEN }}
-          EVENT_TYPE: ${{ needs.metadata.outputs.event_type }}
-          RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
-          RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
-          RELEASE_COMMIT: ${{ needs.metadata.outputs.commit }}
-          RELEASE_EPOCH: ${{ needs.metadata.outputs.source_date_epoch }}
-        run: |
-          set -euo pipefail
-          amd64_sha="$(awk '$2 == "saola-linux-amd64" { print $1 }' dist/SHA256SUMS)"
-          arm64_sha="$(awk '$2 == "saola-linux-arm64" { print $1 }' dist/SHA256SUMS)"
-          test "${#amd64_sha}" -eq 64
-          test "${#arm64_sha}" -eq 64
-          payload="$(jq -n \
-            --arg event_type "${EVENT_TYPE}" \
-            --arg repository "${GITHUB_REPOSITORY}" \
-            --arg channel "${RELEASE_CHANNEL}" \
-            --arg version "${RELEASE_VERSION}" \
-            --arg commit "${RELEASE_COMMIT}" \
-            --arg source_date_epoch "${RELEASE_EPOCH}" \
-            --arg amd64_sha256 "${amd64_sha}" \
-            --arg arm64_sha256 "${arm64_sha}" \
-            '{event_type: $event_type, client_payload: {repository: $repository, channel: $channel, version: $version, commit: $commit, source_date_epoch: $source_date_epoch, checksums: {"linux/amd64": $amd64_sha256, "linux/arm64": $arm64_sha256}}}')"
-          curl --fail-with-body --silent --show-error \
-            --request POST \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer ${OPENSAOLA_DISPATCH_TOKEN}" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/harmonycloud/opensaola/dispatches \
-            --data "${payload}"

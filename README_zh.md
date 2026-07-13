@@ -220,10 +220,12 @@ saola version
 
 ### 自动发布
 
-发布工作流分为两个通道：
+发布工作流由 Saola CLI 独立完成：
 
-- 推送到 `main` 时，以 `dev-<12 位 commit>` 版本生成不可变的工作流产物，并发送 `saola-cli-dev` 事件。该快照只供 OpenSaola `dev` 通道使用，不创建 GitHub Release。
-- 推送 `vMAJOR.MINOR.PATCH` tag（可带 SemVer 预发布后缀）时，将同一组不可变产物发布为 GitHub Release assets，并发送 `saola-cli-stable` 事件。只有该稳定事件可进入 OpenSaola `master` 晋级流程。
+- 推送到 `main` 时，仅以 `dev-<12 位 sha>` 版本生成工作流产物，不创建 GitHub Release。
+- 推送 `vMAJOR.MINOR.PATCH` tag（可带 SemVer 预发布后缀）时，发布不可变的 GitHub Release，其中包含两个 Linux 二进制、`SHA256SUMS`、SBOM、签名和 attestations。
+- OpenSaola 从自身 Docker 工作流解析已发布的最终 Release。
+- 不需要 `OPENSAOLA_DISPATCH_TOKEN`，也不发送 `repository_dispatch` 事件。
 
 每次发布包含静态的 `linux/amd64`、`linux/arm64` 二进制、`SHA256SUMS`、SPDX JSON SBOM 和无密钥 Sigstore bundle。GitHub provenance attestation 通过 GitHub artifact attestation 服务与这些文件关联，不是 `dist/` 中的文件，也不是 GitHub Release asset。stable Release asset 不可变：已有资产必须逐字节一致，已发布 Release 不允许原地修补，draft 只有在每项上传资产均被重新下载并验证后才会发布。版本、完整 commit SHA 与 UTC 构建时间均从触发提交确定。可在本地复现发布产物：
 
@@ -231,8 +233,6 @@ saola version
 make release-build
 make release-checksums
 ```
-
-仓库管理员必须配置 Actions secret `OPENSAOLA_DISPATCH_TOKEN`，并授予它向 `harmonycloud/opensaola` 发送 `repository_dispatch` 事件的权限。凭据缺失时工作流会在 dispatch 前 fail closed；配置该 secret 不能替代目标仓库所需的分支保护和晋级策略。
 
 ## 管理的 CRD 类型
 

@@ -32,6 +32,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Test release workflow contract
+        run: bash hack/release-metadata_test.sh
       - name: Run tests with race detector
         run: go test -race ./... -count=1
 

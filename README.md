@@ -220,10 +220,12 @@ saola version
 
 ### Automated releases
 
-The release workflow has two channels:
+The release workflow publishes Saola CLI independently:
 
-- A push to `main` publishes an immutable workflow artifact with version `dev-<12-character-commit>` and dispatches the `saola-cli-dev` event. It is a snapshot for the OpenSaola `dev` channel and is not a GitHub Release.
-- A `vMAJOR.MINOR.PATCH` tag (optionally with a SemVer prerelease suffix) publishes the same immutable artifacts as GitHub Release assets and dispatches the `saola-cli-stable` event. Only this stable event is eligible for OpenSaola `master` promotion.
+- A push to `main` publishes version `dev-<12-character-sha>` as a workflow artifact only; it does not create a GitHub Release.
+- A `vMAJOR.MINOR.PATCH` tag (optionally with a SemVer prerelease suffix) publishes an immutable GitHub Release with both Linux binaries, `SHA256SUMS`, SBOMs, signatures, and attestations.
+- OpenSaola resolves published final Releases from its own Docker workflow.
+- No `OPENSAOLA_DISPATCH_TOKEN` is required and no `repository_dispatch` event is sent.
 
 Each release build contains static `linux/amd64` and `linux/arm64` binaries, `SHA256SUMS`, SPDX JSON SBOMs, and keyless Sigstore bundles. GitHub provenance attestations are associated with these files through GitHub's artifact attestation service; they are not files in `dist/` or GitHub Release assets. Stable Release assets are immutable: an existing asset must match byte-for-byte, a published release cannot be repaired in place, and a draft is published only after every uploaded asset is downloaded and verified. The version, full commit SHA, and UTC build date are derived from the triggering commit. Local release artifacts can be reproduced with:
 
@@ -231,8 +233,6 @@ Each release build contains static `linux/amd64` and `linux/arm64` binaries, `SH
 make release-build
 make release-checksums
 ```
-
-Repository administrators must configure the Actions secret `OPENSAOLA_DISPATCH_TOKEN` with permission to send `repository_dispatch` events to `harmonycloud/opensaola`. The workflow fails closed before dispatch when this credential is absent; configuring the secret does not replace required branch protection or promotion policy in the target repository.
 
 ## Managed CRD Types
 

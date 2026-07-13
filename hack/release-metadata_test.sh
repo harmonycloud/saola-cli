@@ -68,4 +68,33 @@ pinned_uses_count="$(grep -Ec '^[[:space:]]+(- )?uses: [^@[:space:]]+@[0-9a-f]{4
   fail "all workflow actions must be pinned to a full 40-character commit SHA with a version comment"
 }
 
+for forbidden in \
+  OPENSAOLA_DISPATCH_TOKEN \
+  repository_dispatch \
+  harmonycloud/opensaola/dispatches \
+  'Dispatch immutable OpenSaola update' \
+  'Validate dispatch credential' \
+  event_type \
+  saola-cli-dev \
+  saola-cli-stable; do
+  if grep -Fq "${forbidden}" "${workflow}"; then
+    fail "release workflow still contains downstream coupling: ${forbidden}"
+  fi
+done
+
+for required in \
+  "tags: ['v*']" \
+  'make release-build' \
+  'make release-checksums' \
+  'saola-linux-amd64' \
+  'saola-linux-arm64' \
+  'attest-build-provenance' \
+  'cosign sign-blob' \
+  'actions/upload-artifact' \
+  'gh release create' \
+  'gh release download' \
+  'gh release edit'; do
+  grep -Fq "${required}" "${workflow}" || fail "release workflow lost required contract: ${required}"
+done
+
 printf 'PASS: release metadata contract\n'
