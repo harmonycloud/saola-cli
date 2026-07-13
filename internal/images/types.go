@@ -114,6 +114,7 @@ type ExportOptions struct {
 	Output       string
 	LockFile     string
 	Repositories []string
+	Format       string
 	Platform     string
 	MultiArch    bool
 	Insecure     bool
