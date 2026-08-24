@@ -53,6 +53,18 @@ func (r ExecRunner) Run(ctx context.Context, name string, args ...string) error 
 	return err
 }
 
+func (r ExecRunner) Output(ctx context.Context, name string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return output, nil
+	}
+	if text := strings.TrimSpace(string(output)); text != "" {
+		return nil, fmt.Errorf("%w: %s", err, text)
+	}
+	return nil, err
+}
+
 func (r ExecRunner) RunStreaming(ctx context.Context, stdout io.Writer, stderr io.Writer, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdout = stdout

@@ -40,6 +40,8 @@ const (
 	ExportFormatSkopeo = "skopeo"
 	// ExportFormatDocker exports a Docker archive that can be loaded by docker or nerdctl.
 	ExportFormatDocker = "docker"
+	// ExportFormatDockerMulti exports a multi-platform OCI archive loadable by modern Docker with the containerd image store.
+	ExportFormatDockerMulti = "docker-multi"
 )
 
 // ExportResult contains the resolved images and generated lock file.
@@ -73,8 +75,13 @@ func ExportPackage(ctx context.Context, opts ExportOptions) (*ExportResult, erro
 		opts.Platform = "all"
 	}
 	opts.Format = normalizeExportFormat(opts.Format)
-	if opts.Format != ExportFormatSkopeo && opts.Format != ExportFormatDocker {
-		return nil, fmt.Errorf("unsupported image export format %q (supported: %s, %s)", opts.Format, ExportFormatSkopeo, ExportFormatDocker)
+	if opts.Format != ExportFormatSkopeo && opts.Format != ExportFormatDocker && opts.Format != ExportFormatDockerMulti {
+		return nil, fmt.Errorf("unsupported image export format %q (supported: %s, %s, %s)", opts.Format, ExportFormatSkopeo, ExportFormatDocker, ExportFormatDockerMulti)
+	}
+	if opts.Format == ExportFormatDockerMulti {
+		if _, err := requiredDockerMultiPlatforms(opts); err != nil {
+			return nil, err
+		}
 	}
 
 	meta, groups, err := DiscoverPackageImages(opts.PkgDir, opts.Repositories)
@@ -95,6 +102,16 @@ func ExportPackage(ctx context.Context, opts ExportOptions) (*ExportResult, erro
 	}
 
 	runner := defaultRunner(opts.Runner)
+	if opts.Format == ExportFormatDockerMulti {
+		if _, err = runner.LookPath(toolSkopeo); err != nil {
+			return nil, fmt.Errorf("--format=%s requires skopeo", ExportFormatDockerMulti)
+		}
+	}
+	if opts.Format == ExportFormatDocker && opts.Insecure {
+		if _, err = runner.LookPath(toolSkopeo); err != nil {
+			return nil, fmt.Errorf("--format=%s with --insecure requires skopeo to pull images without TLS verification", ExportFormatDocker)
+		}
+	}
 	resolved, missing, err := resolveImages(ctx, runner, groups, opts)
 	if err != nil {
 		return nil, err
@@ -114,11 +131,10 @@ func ExportPackage(ctx context.Context, opts ExportOptions) (*ExportResult, erro
 	if lockPath == "" {
 		lockPath = output + ".lock.json"
 	}
-	lock := buildLock(meta, opts.Repositories, resolved, missing)
-
 	if err = exportImages(ctx, runner, resolved, output, opts); err != nil {
 		return nil, err
 	}
+	lock := buildLock(meta, opts.Repositories, resolved, missing)
 	if err = writeLockFile(lockPath, lock); err != nil {
 		return nil, err
 	}
@@ -139,11 +155,22 @@ func resolveImages(ctx context.Context, runner Runner, groups []ImageGroup, opts
 			}
 		}
 	}
+	multiPlatform := normalizeExportFormat(opts.Format) == ExportFormatDockerMulti
+	var requiredPlatforms []platformSpec
+	platformRunner, canInspectPlatforms := runner.(outputRunner)
+	if multiPlatform {
+		var err error
+		requiredPlatforms, err = requiredDockerMultiPlatforms(opts)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
 
 	var resolved []ResolvedImage
 	var missing []MissingImage
 	for _, group := range groups {
 		var hit *ImageCandidate
+		var hitPlatforms []string
 		inspected := map[string]bool{}
 		var probeErrors []ProbeError
 		for _, candidate := range group.Candidates {
@@ -151,6 +178,35 @@ func resolveImages(ctx context.Context, runner Runner, groups []ImageGroup, opts
 				continue
 			}
 			inspected[candidate.Image] = true
+			if multiPlatform && canInspectPlatforms {
+				available, inspectErr := inspectRemotePlatforms(ctx, platformRunner, candidate.Image, opts)
+				if inspectErr != nil {
+					probeErrors = append(probeErrors, ProbeError{
+						Image:      candidate.Image,
+						Repository: candidate.Repository,
+						File:       candidate.File,
+						Field:      candidate.Field,
+						Reason:     classifyProbeError(inspectErr),
+						Message:    inspectErr.Error(),
+					})
+					continue
+				}
+				if missingPlatforms := missingRequiredPlatforms(requiredPlatforms, available); len(missingPlatforms) > 0 {
+					probeErrors = append(probeErrors, ProbeError{
+						Image:      candidate.Image,
+						Repository: candidate.Repository,
+						File:       candidate.File,
+						Field:      candidate.Field,
+						Reason:     "PlatformMissing",
+						Message:    fmt.Sprintf("missing required platforms %s (available: %s)", strings.Join(missingPlatforms, ", "), formatOCIPlatforms(available)),
+					})
+					continue
+				}
+				copyCandidate := candidate
+				hit = &copyCandidate
+				hitPlatforms = selectedPlatformNames(requiredPlatforms, available)
+				break
+			}
 			ok, err := inspectImage(ctx, runner, candidate.Image, opts)
 			if err != nil {
 				probeErrors = append(probeErrors, ProbeError{
@@ -184,6 +240,7 @@ func resolveImages(ctx context.Context, runner Runner, groups []ImageGroup, opts
 			File:       hit.File,
 			Field:      hit.Field,
 			Version:    hit.Version,
+			Platforms:  hitPlatforms,
 			Candidates: group.Candidates,
 		})
 	}
@@ -277,8 +334,13 @@ func exportImages(ctx context.Context, runner Runner, images []ResolvedImage, ou
 			return exportWithNerdctl(ctx, runner, images, output, opts)
 		}
 		return fmt.Errorf("--format=%s requires docker or nerdctl", ExportFormatDocker)
+	case ExportFormatDockerMulti:
+		if _, err := runner.LookPath(toolSkopeo); err != nil {
+			return fmt.Errorf("--format=%s requires skopeo", ExportFormatDockerMulti)
+		}
+		return exportWithDockerMulti(ctx, runner, images, output, opts)
 	default:
-		return fmt.Errorf("unsupported image export format %q (supported: %s, %s)", opts.Format, ExportFormatSkopeo, ExportFormatDocker)
+		return fmt.Errorf("unsupported image export format %q (supported: %s, %s, %s)", opts.Format, ExportFormatSkopeo, ExportFormatDocker, ExportFormatDockerMulti)
 	}
 }
 
@@ -327,17 +389,43 @@ func exportWithSkopeo(ctx context.Context, runner Runner, images []ResolvedImage
 }
 
 func exportWithDocker(ctx context.Context, runner Runner, images []ResolvedImage, output string, opts ExportOptions) error {
+	useSkopeo := opts.Insecure
+	if useSkopeo {
+		if _, err := runner.LookPath(toolSkopeo); err != nil {
+			return fmt.Errorf("--format=%s with --insecure requires skopeo to pull images without TLS verification", ExportFormatDocker)
+		}
+	}
+
 	imageNames := make([]string, 0, len(images))
 	progressOut := progressOutput(opts)
 	for i, item := range images {
 		printImageProgress(progressOut, i, len(images), "pulling", item.Image)
-		args := []string{"pull"}
-		if opts.Platform != "" && opts.Platform != "all" {
-			args = append(args, "--platform", opts.Platform)
-		}
-		args = append(args, item.Image)
-		if err := runStreaming(ctx, runner, progressOut, progressOut, toolDocker, args...); err != nil {
-			return fmt.Errorf("pull %s with docker: %w", item.Image, err)
+		if useSkopeo {
+			args := []string{"copy"}
+			if opts.Platform != "" && opts.Platform != "all" {
+				platformArgs, err := skopeoPlatformArgs(opts.Platform)
+				if err != nil {
+					return err
+				}
+				args = append(args, platformArgs...)
+			}
+			args = append(args,
+				"--src-tls-verify=false",
+				"docker://"+item.Image,
+				"docker-daemon:"+item.Image,
+			)
+			if err := runStreaming(ctx, runner, progressOut, progressOut, toolSkopeo, args...); err != nil {
+				return fmt.Errorf("pull %s with skopeo into docker: %w", item.Image, err)
+			}
+		} else {
+			args := []string{"pull"}
+			if opts.Platform != "" && opts.Platform != "all" {
+				args = append(args, "--platform", opts.Platform)
+			}
+			args = append(args, item.Image)
+			if err := runStreaming(ctx, runner, progressOut, progressOut, toolDocker, args...); err != nil {
+				return fmt.Errorf("pull %s with docker: %w", item.Image, err)
+			}
 		}
 		printImageProgress(progressOut, i+1, len(images), "pulled", item.Image)
 		imageNames = append(imageNames, item.Image)
@@ -382,6 +470,10 @@ type streamingRunner interface {
 	RunStreaming(ctx context.Context, stdout io.Writer, stderr io.Writer, name string, args ...string) error
 }
 
+type outputRunner interface {
+	Output(ctx context.Context, name string, args ...string) ([]byte, error)
+}
+
 func runStreaming(ctx context.Context, runner Runner, stdout io.Writer, stderr io.Writer, name string, args ...string) error {
 	if stderr == nil {
 		stderr = io.Discard
@@ -408,6 +500,16 @@ func runStreaming(ctx context.Context, runner Runner, stdout io.Writer, stderr i
 			fmt.Fprintf(stderr, "Still running %s %s (%s elapsed)\n", name, commandAction(args), time.Since(start).Round(time.Second))
 		}
 	}
+}
+
+func runOutputWithTimeout(ctx context.Context, runner outputRunner, timeout time.Duration, name string, args ...string) ([]byte, error) {
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	output, err := runner.Output(runCtx, name, args...)
+	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+		return nil, fmt.Errorf("timed out after %s", timeout)
+	}
+	return output, err
 }
 
 func progressOutput(opts ExportOptions) io.Writer {

@@ -63,6 +63,21 @@ func TestNewCmdImages_HasExport(t *testing.T) {
 	}
 }
 
+func TestNewCmdExport_DockerMultiPlatformDefaults(t *testing.T) {
+	t.Parallel()
+	cmd := NewCmdExport(&config.Config{})
+	platforms, err := cmd.Flags().GetStringSlice("platforms")
+	if err != nil {
+		t.Fatalf("GetStringSlice platforms: %v", err)
+	}
+	if got := strings.Join(platforms, ","); got != "linux/amd64,linux/arm64" {
+		t.Fatalf("unexpected default docker-multi platforms %q", got)
+	}
+	if !strings.Contains(cmd.Flag("format").Usage, "docker-multi") {
+		t.Fatalf("format help should mention docker-multi, got %q", cmd.Flag("format").Usage)
+	}
+}
+
 func makeCmdImagePackage(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

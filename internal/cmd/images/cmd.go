@@ -42,6 +42,7 @@ type ExportOptions struct {
 	Repositories []string
 	Format       string
 	Platform     string
+	Platforms    []string
 	MultiArch    bool
 	Insecure     bool
 	SkipMissing  bool
@@ -77,6 +78,7 @@ func NewCmdExport(cfg *config.Config) *cobra.Command {
 		Config:    cfg,
 		Format:    imageexport.ExportFormatSkopeo,
 		Platform:  "all",
+		Platforms: []string{"linux/amd64", "linux/arm64"},
 		MultiArch: true,
 		Timeout:   imageexport.DefaultProbeTimeout,
 		Out:       os.Stdout,
@@ -87,12 +89,13 @@ func NewCmdExport(cfg *config.Config) *cobra.Command {
 		Use:   "export <pkg-dir>",
 		Short: lang.T("导出包依赖的容器镜像", "Export package container images"),
 		Long: lang.T(
-			`扫描本地中间件包中的镜像引用，按 --repository 的声明顺序探测镜像是否存在，并把命中的镜像导出为归档文件。`,
-			`Scan image references in a local middleware package, probe repositories in --repository order, and export the resolved images as an archive.`,
+			`扫描本地中间件包中的镜像引用，按 --repository 的声明顺序探测镜像是否存在，并把命中的镜像导出为归档文件。docker-multi 会生成根级 OCI layout，docker load 时要求目标 Docker 使用 containerd image store。`,
+			`Scan image references in a local middleware package, probe repositories in --repository order, and export the resolved images as an archive. docker-multi produces a root OCI layout and requires the target Docker to use the containerd image store when loading.`,
 		),
 		Example: `  saola images export ./redis -r 10.10.101.172:443/middleware -r 10.10.102.124:443/middleware
   saola images export ./redis -r 10.10.101.172:443/middleware,10.10.102.124:443/middleware -o redis-images.tar
   saola images export ./redis -r 10.10.101.172:443/middleware --format docker -o redis-images-docker.tar
+  saola images export ./redis -r 10.10.101.172:443/middleware --format docker-multi --platforms linux/amd64,linux/arm64 -o redis-images-multi.tar
   saola images export ./redis -r 10.10.101.172:443/middleware --dry-run`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -106,10 +109,11 @@ func NewCmdExport(cfg *config.Config) *cobra.Command {
 	cmd.Flags().StringArrayVarP(&o.Repositories, "repository", "r", nil, lang.T("候选镜像仓库，可重复声明或用逗号分隔", "Candidate image repository; repeat or comma-separate values"))
 	cmd.Flags().StringVarP(&o.Output, "output", "o", "", lang.T("输出镜像归档路径（默认：<name>-<version>-images.tar）", "Output image archive path (default: <name>-<version>-images.tar)"))
 	cmd.Flags().StringVar(&o.LockFile, "lock-file", "", lang.T("输出镜像锁定清单路径（默认：<output>.lock.json）", "Output image lock file path (default: <output>.lock.json)"))
-	cmd.Flags().StringVar(&o.Format, "format", imageexport.ExportFormatSkopeo, lang.T("导出格式：skopeo 为 OCI layout，docker 为 docker/nerdctl load 归档", "Export format: skopeo for OCI layout, docker for docker/nerdctl load archive"))
+	cmd.Flags().StringVar(&o.Format, "format", imageexport.ExportFormatSkopeo, lang.T("导出格式：skopeo 为导入仓库用 OCI layout；docker 为单架构 load 归档；docker-multi 为现代 Docker 多架构 load 归档", "Export format: skopeo for registry import OCI layout; docker for single-platform load archives; docker-multi for modern Docker multi-platform load archives"))
 	cmd.Flags().StringVar(&o.Platform, "platform", "all", lang.T("导出平台，例如 linux/amd64；skopeo 格式下 all 表示保留多架构", "Export platform, for example linux/amd64; all keeps multi-arch images with skopeo format"))
+	cmd.Flags().StringSliceVar(&o.Platforms, "platforms", o.Platforms, lang.T("docker-multi 归档必须包含的平台，可用逗号分隔", "Platforms required in a docker-multi archive; comma-separated values are supported"))
 	cmd.Flags().BoolVar(&o.MultiArch, "multi-arch", true, lang.T("使用 skopeo 导出时保留多架构清单", "Keep multi-arch manifests when exporting with skopeo"))
-	cmd.Flags().BoolVar(&o.Insecure, "insecure", false, lang.T("跳过镜像仓库 TLS 校验", "Skip registry TLS verification"))
+	cmd.Flags().BoolVar(&o.Insecure, "insecure", false, lang.T("跳过镜像仓库 TLS 校验（docker 格式需安装 skopeo）", "Skip registry TLS verification (docker format requires skopeo)"))
 	cmd.Flags().BoolVar(&o.SkipMissing, "skip-missing", false, lang.T("存在无法解析的镜像时仍导出已命中的镜像", "Export resolved images even when some images are missing"))
 	cmd.Flags().BoolVar(&o.DryRun, "dry-run", false, lang.T("仅打印镜像候选，不执行导出", "Print image candidates without exporting"))
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", imageexport.DefaultProbeTimeout, lang.T("单个镜像探测的超时时间", "Timeout for each image probe"))
@@ -136,6 +140,7 @@ func (o *ExportOptions) Run(ctx context.Context) error {
 		Repositories: o.Repositories,
 		Format:       o.Format,
 		Platform:     o.Platform,
+		Platforms:    o.Platforms,
 		MultiArch:    o.MultiArch,
 		Insecure:     o.Insecure,
 		SkipMissing:  o.SkipMissing,
