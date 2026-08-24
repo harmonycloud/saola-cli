@@ -141,17 +141,26 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 
 	fmt.Fprintf(os.Stdout, "middleware/%s created\n", mw.Name)
 
-	// Warn if the Middleware needs a MiddlewareOperator but none exists yet.
+	// Warn if the Middleware needs a MiddlewareOperator but no instance uses the
+	// referenced MiddlewareOperatorBaseline yet. operatorBaseline.name is a
+	// baseline name, not a MiddlewareOperator instance name.
 	// Middleware does NOT auto-create MiddlewareOperator — they must be created independently.
 	//
-	// 若 Middleware 依赖 MiddlewareOperator 但目标命名空间中不存在，打印警告。
-	// Middleware 不会自动创建 MiddlewareOperator，需独立创建。
+	// 若 Middleware 依赖 MiddlewareOperator，但目标命名空间没有实例引用该
+	// MiddlewareOperatorBaseline，则打印告警。operatorBaseline.name 是基线名，
+	// 不是 MiddlewareOperator 实例名。Middleware 不会自动创建
+	// MiddlewareOperator，需独立创建。
 	if mw.Spec.OperatorBaseline.Name != "" {
 		if mw.Annotations == nil || mw.Annotations[zeusv1.LabelNoOperator] == "" {
-			_, moErr := zeusk8s.GetMiddlewareOperator(ctx, cli, mw.Spec.OperatorBaseline.Name, mw.Namespace)
+			found, moErr := middlewareOperatorUsesBaseline(ctx, cli, mw.Namespace, mw.Spec.OperatorBaseline.Name)
 			if moErr != nil {
 				fmt.Fprintf(os.Stderr,
-					"warning: MiddlewareOperator %q not found in namespace %q; "+
+					"warning: could not verify MiddlewareOperator for baseline %q in namespace %q: %v\n",
+					mw.Spec.OperatorBaseline.Name, mw.Namespace, moErr,
+				)
+			} else if !found {
+				fmt.Fprintf(os.Stderr,
+					"warning: no MiddlewareOperator using baseline %q found in namespace %q; "+
 						"create it with 'saola operator create' or the Middleware may not become Available\n",
 					mw.Spec.OperatorBaseline.Name, mw.Namespace,
 				)
@@ -160,6 +169,24 @@ func (o *CreateOptions) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// middlewareOperatorUsesBaseline reports whether the namespace contains an
+// operator instance that references the supplied MiddlewareOperatorBaseline.
+//
+// middlewareOperatorUsesBaseline 判断命名空间中是否存在引用指定
+// MiddlewareOperatorBaseline 的 Operator 实例。
+func middlewareOperatorUsesBaseline(ctx context.Context, cli sigs.Client, namespace, baseline string) (bool, error) {
+	var operators zeusv1.MiddlewareOperatorList
+	if err := cli.List(ctx, &operators, sigs.InNamespace(namespace)); err != nil {
+		return false, fmt.Errorf("list MiddlewareOperators: %w", err)
+	}
+	for i := range operators.Items {
+		if operators.Items[i].Spec.Baseline == baseline {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // enrichMiddleware auto-completes the labels and operatorBaseline fields that

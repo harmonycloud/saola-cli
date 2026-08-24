@@ -188,6 +188,110 @@ spec:
 	}
 }
 
+// TestMiddlewareCreate_DoesNotWarnWhenOperatorInstanceUsesBaseline verifies
+// that operatorBaseline.name is matched against MiddlewareOperator.spec.baseline,
+// rather than the MiddlewareOperator instance name.
+//
+// TestMiddlewareCreate_DoesNotWarnWhenOperatorInstanceUsesBaseline 验证
+// operatorBaseline.name 应匹配 MiddlewareOperator.spec.baseline，而非实例名。
+func TestMiddlewareCreate_DoesNotWarnWhenOperatorInstanceUsesBaseline(t *testing.T) {
+	yaml := `
+apiVersion: middleware.cn/v1
+kind: Middleware
+metadata:
+  name: kong-route
+  namespace: test-ns
+  labels:
+    middleware.cn/packagename: kong-2.2.3-1.0.0
+spec:
+  baseline: kong-httproute
+  operatorBaseline:
+    name: kong-operator-highly-available
+    gvkName: HTTPRoute-v1
+`
+	path := writeTempYAML(t, yaml)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	operator := &zeusv1.MiddlewareOperator{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kong-ha-operator",
+			Namespace: "test-ns",
+		},
+		Spec: zeusv1.MiddlewareOperatorSpec{
+			Baseline: "kong-operator-highly-available",
+		},
+	}
+	o := &CreateOptions{
+		Config: newCfg(""),
+		File:   path,
+		Client: newFakeClient(operator),
+	}
+
+	stderr, err := captureStderr(t, func() error {
+		return o.Run(context.Background())
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if stderr != "" {
+		t.Fatalf("expected no missing-operator warning, got: %s", stderr)
+	}
+}
+
+// TestMiddlewareCreate_WarnsWhenSameNamedOperatorUsesOtherBaseline verifies
+// that a MiddlewareOperator with the baseline's name does not suppress the
+// warning when its spec.baseline is different.
+//
+// TestMiddlewareCreate_WarnsWhenSameNamedOperatorUsesOtherBaseline 验证实例名
+// 恰好等于基线名但 spec.baseline 不匹配时，不能错误地抑制告警。
+func TestMiddlewareCreate_WarnsWhenSameNamedOperatorUsesOtherBaseline(t *testing.T) {
+	yaml := `
+apiVersion: middleware.cn/v1
+kind: Middleware
+metadata:
+  name: kong-route
+  namespace: test-ns
+  labels:
+    middleware.cn/packagename: kong-2.2.3-1.0.0
+spec:
+  baseline: kong-httproute
+  operatorBaseline:
+    name: kong-operator-highly-available
+    gvkName: HTTPRoute-v1
+`
+	path := writeTempYAML(t, yaml)
+	defer func() {
+		_ = os.Remove(path)
+	}()
+
+	operator := &zeusv1.MiddlewareOperator{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kong-operator-highly-available",
+			Namespace: "test-ns",
+		},
+		Spec: zeusv1.MiddlewareOperatorSpec{
+			Baseline: "other-operator-baseline",
+		},
+	}
+	o := &CreateOptions{
+		Config: newCfg(""),
+		File:   path,
+		Client: newFakeClient(operator),
+	}
+
+	stderr, err := captureStderr(t, func() error {
+		return o.Run(context.Background())
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if stderr == "" {
+		t.Fatal("expected a missing-operator warning")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // delete tests
 // delete 相关测试
@@ -485,6 +589,30 @@ func captureStdout(run func() error) (string, error) {
 		return string(out), runErr
 	}
 	return string(out), nil
+}
+
+func captureStderr(t *testing.T, run func() error) (string, error) {
+	t.Helper()
+	old := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		return "", err
+	}
+	os.Stderr = w
+	defer func() {
+		os.Stderr = old
+		_ = r.Close()
+	}()
+
+	runErr := run()
+	if err := w.Close(); err != nil {
+		return "", err
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		return "", err
+	}
+	return string(out), runErr
 }
 
 // ---------------------------------------------------------------------------
