@@ -71,6 +71,7 @@ type ResolvedImage struct {
 	File       string           `json:"file" yaml:"file"`
 	Field      string           `json:"field" yaml:"field"`
 	Version    string           `json:"version,omitempty" yaml:"version,omitempty"`
+	Platforms  []string         `json:"platforms,omitempty" yaml:"platforms,omitempty"`
 	Candidates []ImageCandidate `json:"candidates,omitempty" yaml:"candidates,omitempty"`
 }
 
@@ -116,6 +117,7 @@ type ExportOptions struct {
 	Repositories []string
 	Format       string
 	Platform     string
+	Platforms    []string
 	MultiArch    bool
 	Insecure     bool
 	SkipMissing  bool
