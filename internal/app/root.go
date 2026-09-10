@@ -29,6 +29,7 @@ import (
 	imagescmd "github.com/harmonycloud/saola-cli/internal/cmd/images"
 	inspectcmd "github.com/harmonycloud/saola-cli/internal/cmd/inspect"
 	installcmd "github.com/harmonycloud/saola-cli/internal/cmd/install"
+	migratecmd "github.com/harmonycloud/saola-cli/internal/cmd/migrate"
 	runcmd "github.com/harmonycloud/saola-cli/internal/cmd/run"
 	uninstallcmd "github.com/harmonycloud/saola-cli/internal/cmd/uninstall"
 	upgradecmd "github.com/harmonycloud/saola-cli/internal/cmd/upgrade"
@@ -77,6 +78,7 @@ func NewRootCmd() *cobra.Command {
 	// 新的 kubectl 风格动词命令。
 	root.AddCommand(
 		getcmd.NewCmdGet(cfg),
+		migratecmd.NewCmdMigrate(cfg),
 		createcmd.NewCmdCreate(cfg),
 		deletecmd.NewCmdDelete(cfg),
 		describecmd.NewCmdDescribe(cfg),
