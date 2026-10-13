@@ -111,7 +111,3 @@ func (c *Client) buildRestConfig() (*rest.Config, error) {
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
 	return kubeConfig.ClientConfig()
 }
-
-// RESTConfig returns a fresh config honoring the CLI context and kubeconfig.
-// RESTConfig 返回遵循 CLI context 和 kubeconfig 的独立连接配置。
-func (c *Client) RESTConfig() (*rest.Config, error) { return c.buildRestConfig() }
