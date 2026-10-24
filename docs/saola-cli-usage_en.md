@@ -17,11 +17,14 @@
   - [2.5 Environment Variables](#25-environment-variables)
 - [3. Command Reference](#3-command-reference)
   - [3.1 Package Management (saola pkg)](#31-package-management-saola-pkg)
-  - [3.2 Middleware Instance Management (saola middleware)](#32-middleware-instance-management-saola-middleware)
-  - [3.3 Operator Management (saola operator)](#33-operator-management-saola-operator)
-  - [3.4 Baseline Management (saola baseline)](#34-baseline-management-saola-baseline)
-  - [3.5 Action Management (saola action)](#35-action-management-saola-action)
-  - [3.6 Shortcut Commands](#36-shortcut-commands)
+  - [3.2 Middleware Instance Management](#32-middleware-instance-management)
+  - [3.3 Operator Management](#33-operator-management)
+  - [3.4 Baseline Management](#34-baseline-management)
+  - [3.5 Action Management](#35-action-management)
+  - [3.6 Top-level Commands](#36-top-level-commands)
+  - [3.7 Package Image Export and Import](#37-package-image-export-and-import)
+  - [3.8 Local Package Validation](#38-local-package-validation)
+  - [3.9 Help and Shell Completion](#39-help-and-shell-completion)
 - [4. Package Specification](#4-package-specification)
   - [4.1 TAR Package Format and Directory Structure](#41-tar-package-format-and-directory-structure)
   - [4.2 metadata.yaml Requirements](#42-metadatayaml-requirements)
@@ -35,6 +38,7 @@
   - [6.2 Package Lifecycle](#62-package-lifecycle)
   - [6.3 Middleware Instance Lifecycle](#63-middleware-instance-lifecycle)
   - [6.4 Operator Lifecycle](#64-operator-lifecycle)
+  - [6.5 Offline Package and Image Delivery](#65-offline-package-and-image-delivery)
 - [7. Interactive Creation Details](#7-interactive-creation-details)
   - [7.1 Interactive Flow](#71-interactive-flow)
   - [7.2 JSON Schema Support](#72-json-schema-support)
@@ -102,9 +106,9 @@ Version information is injected via `-ldflags` during build:
 
 | Variable | Description |
 |----------|-------------|
-| `Version` | git describe tag version, defaults to `dev` |
-| `GitCommit` | git rev-parse short commit hash, defaults to `unknown` |
-| `BuildDate` | UTC format build time, defaults to `unknown` |
+| `Version` | Exact tag for official releases; local Makefile builds use git describe, falling back to `dev` |
+| `GitCommit` | Full Git commit hash, falling back to `unknown` |
+| `BuildDate` | Source commit time converted to UTC, falling back to `unknown` |
 
 ---
 
@@ -212,7 +216,7 @@ saola package build ./my-redis --output ./dist/redis-v1.pkg
 | `<pkg-dir>` | - | positional | required | Local package directory path |
 | `--name` | - | string | `<name>-<version>` | Override Secret name |
 | `--wait` | - | duration | `0` (no wait) | Timeout for waiting for installation to complete (e.g., `5m`) |
-| `--dry-run` | - | bool | `false` | Print Secret manifest without actually creating it |
+| `--dry-run` | - | bool | `false` | Pack and print the target Secret name without creating it or emitting full YAML |
 
 **Examples**:
 ```bash
@@ -356,15 +360,15 @@ saola package list -o yaml
 
 ---
 
-### 3.2 Middleware Instance Management (saola middleware)
+### 3.2 Middleware Instance Management
 
-Middleware management commands are accessed via `saola middleware` (alias `saola mw`).
+Use `saola get middleware`, `saola describe middleware`, `saola upgrade middleware`, and `saola delete middleware`; the resource alias is `mw`. Create resources with `saola create -f <file>`.
 
 ---
 
-#### saola middleware create
+#### saola create — Middleware
 
-**Syntax**: `saola middleware create [flags]`
+**Syntax**: `saola create -f <file> [flags]`
 
 **Description**: Read a Middleware manifest from the specified YAML file and create it in the cluster. The command automatically finds the matching MiddlewareBaseline from installed packages based on `spec.baseline`, and populates the following labels and `spec.operatorBaseline`:
 
@@ -382,8 +386,8 @@ Middleware management commands are accessed via `saola middleware` (alias `saola
 
 **Examples**:
 ```bash
-saola middleware create -f middleware.yaml
-saola middleware create -f middleware.yaml -n production
+saola create -f middleware.yaml
+saola create -f middleware.yaml -n production
 ```
 
 **Notes**:
@@ -394,9 +398,9 @@ saola middleware create -f middleware.yaml -n production
 
 ---
 
-#### saola middleware get
+#### saola get middleware
 
-**Syntax**: `saola middleware get [name] [flags]`
+**Syntax**: `saola get middleware [name] [flags]`
 
 **Description**: List all Middleware resources in a namespace, or get a single resource by name.
 
@@ -411,10 +415,10 @@ saola middleware create -f middleware.yaml -n production
 
 **Examples**:
 ```bash
-saola middleware get
-saola middleware get my-redis
-saola middleware get my-redis -o yaml
-saola middleware get -A -o json
+saola get middleware
+saola get middleware my-redis
+saola get middleware my-redis -o yaml
+saola get middleware -A -o json
 ```
 
 **Notes**:
@@ -424,9 +428,9 @@ saola middleware get -A -o json
 
 ---
 
-#### saola middleware describe
+#### saola describe middleware
 
-**Syntax**: `saola middleware describe <name> [flags]`
+**Syntax**: `saola describe middleware <name> [flags]`
 
 **Description**: Get a single Middleware resource and output its spec, status, and conditions in a human-readable format.
 
@@ -439,8 +443,8 @@ saola middleware get -A -o json
 
 **Examples**:
 ```bash
-saola middleware describe my-redis
-saola middleware describe my-redis -n production
+saola describe middleware my-redis
+saola describe middleware my-redis -n production
 ```
 
 **Output content**:
@@ -451,9 +455,9 @@ saola middleware describe my-redis -n production
 
 ---
 
-#### saola middleware upgrade
+#### saola upgrade middleware
 
-**Syntax**: `saola middleware upgrade <name> [flags]` (accessed via `saola upgrade middleware`)
+**Syntax**: `saola upgrade middleware <name> [flags]`
 
 **Description**: Trigger OpenSaola to perform a version upgrade by setting `middleware.cn/update` and `middleware.cn/baseline` annotations on the Middleware CR.
 
@@ -481,9 +485,9 @@ saola upgrade mw my-redis --to-version 7.2.1 --wait 5m -n production
 
 ---
 
-#### saola middleware delete
+#### saola delete middleware
 
-**Syntax**: `saola middleware delete <name> [flags]`
+**Syntax**: `saola delete middleware <name> [flags]`
 
 **Description**: Delete a Middleware resource by name. Silently skips if the resource does not exist.
 
@@ -497,22 +501,22 @@ saola upgrade mw my-redis --to-version 7.2.1 --wait 5m -n production
 
 **Examples**:
 ```bash
-saola middleware delete my-redis
-saola middleware delete my-redis -n production
-saola middleware delete my-redis --wait 2m
+saola delete middleware my-redis
+saola delete middleware my-redis -n production
+saola delete middleware my-redis --wait 2m
 ```
 
 ---
 
-### 3.3 Operator Management (saola operator)
+### 3.3 Operator Management
 
-Operator management commands are accessed via `saola operator`.
+Use `saola get operator`, `saola describe operator`, `saola upgrade operator`, and `saola delete operator`; the resource alias is `op`. Create resources with `saola create -f <file>`.
 
 ---
 
-#### saola operator create
+#### saola create — MiddlewareOperator
 
-**Syntax**: `saola operator create [flags]`
+**Syntax**: `saola create -f <file> [flags]`
 
 **Description**: Read a MiddlewareOperator manifest from a YAML file and create it in the cluster. The command automatically finds the matching MiddlewareOperatorBaseline from installed packages based on `spec.baseline`, and populates the four required labels.
 
@@ -525,8 +529,8 @@ Operator management commands are accessed via `saola operator`.
 
 **Examples**:
 ```bash
-saola operator create -f operator.yaml
-saola operator create -f operator.yaml --namespace my-ns
+saola create -f operator.yaml
+saola create -f operator.yaml --namespace my-ns
 ```
 
 **Notes**:
@@ -536,9 +540,9 @@ saola operator create -f operator.yaml --namespace my-ns
 
 ---
 
-#### saola operator get
+#### saola get operator
 
-**Syntax**: `saola operator get [name] [flags]`
+**Syntax**: `saola get operator [name] [flags]`
 
 **Description**: List or query MiddlewareOperator resources.
 
@@ -553,9 +557,9 @@ saola operator create -f operator.yaml --namespace my-ns
 
 **Examples**:
 ```bash
-saola operator get
-saola operator get redis-operator -n my-ns
-saola operator get -A -o yaml
+saola get operator
+saola get operator redis-operator -n my-ns
+saola get operator -A -o yaml
 ```
 
 **Notes**:
@@ -565,9 +569,9 @@ saola operator get -A -o yaml
 
 ---
 
-#### saola operator describe
+#### saola describe operator
 
-**Syntax**: `saola operator describe <name> [flags]`
+**Syntax**: `saola describe operator <name> [flags]`
 
 **Description**: Print the complete spec, status, conditions, and Deployment status for each operator of a MiddlewareOperator.
 
@@ -580,7 +584,7 @@ saola operator get -A -o yaml
 
 **Examples**:
 ```bash
-saola operator describe redis-operator -n my-ns
+saola describe operator redis-operator -n my-ns
 ```
 
 **Output content**:
@@ -593,9 +597,9 @@ saola operator describe redis-operator -n my-ns
 
 ---
 
-#### saola operator upgrade
+#### saola upgrade operator
 
-**Syntax**: `saola operator upgrade <name> [flags]` (accessed via `saola upgrade operator`)
+**Syntax**: `saola upgrade operator <name> [flags]`
 
 **Description**: Trigger controller upgrade by setting `middleware.cn/update` and `middleware.cn/baseline` annotations.
 
@@ -625,9 +629,9 @@ saola upgrade op redis-op --to-version 1.2.0 -n my-ns --wait 5m
 
 ---
 
-#### saola operator delete
+#### saola delete operator
 
-**Syntax**: `saola operator delete <name> [flags]`
+**Syntax**: `saola delete operator <name> [flags]`
 
 **Description**: Delete a MiddlewareOperator by name.
 
@@ -641,8 +645,8 @@ saola upgrade op redis-op --to-version 1.2.0 -n my-ns --wait 5m
 
 **Examples**:
 ```bash
-saola operator delete redis-operator --namespace my-ns
-saola operator delete redis-operator -n my-ns --wait 2m
+saola delete operator redis-operator --namespace my-ns
+saola delete operator redis-operator -n my-ns --wait 2m
 ```
 
 **Notes**:
@@ -651,15 +655,17 @@ saola operator delete redis-operator -n my-ns --wait 2m
 
 ---
 
-### 3.4 Baseline Management (saola baseline)
+### 3.4 Baseline Management
 
-Baseline commands are accessed via `saola baseline` (alias `bl`).
+Query baselines with `saola get baseline [name] --package <package>`; the resource alias is `bl`.
+
+Named lookup supports only `middleware` and `operator`; use `saola get baseline --package <package> --kind action` to list action baselines.
 
 ---
 
-#### saola baseline get
+#### saola get baseline <name>
 
-**Syntax**: `saola baseline get <name> [flags]`
+**Syntax**: `saola get baseline <name> [flags]`
 
 **Description**: Get a single MiddlewareBaseline or MiddlewareOperatorBaseline by name from installed middleware packages.
 
@@ -670,19 +676,19 @@ Baseline commands are accessed via `saola baseline` (alias `bl`).
 | `<name>` | - | positional | required | Baseline name |
 | `--package` | - | string | required | Package name to query |
 | `--kind` | - | string | `middleware` | Baseline type: `middleware`, `operator` |
-| `--output` | `-o` | string | `yaml` | Output format: `table`, `yaml`, `json` |
+| `--output` | `-o` | string | `table` | Output format: `table`, `yaml`, `json` |
 
 **Examples**:
 ```bash
-saola baseline get default --package redis-v1
-saola baseline get default --package redis-v1 --kind operator -o yaml
+saola get baseline default --package redis-v1
+saola get baseline default --package redis-v1 --kind operator -o yaml
 ```
 
 ---
 
-#### saola baseline list
+#### saola get baseline (list)
 
-**Syntax**: `saola baseline list [flags]` (alias: `saola baseline ls`)
+**Syntax**: `saola get baseline [flags]` (alias: `saola get bl`)
 
 **Description**: List all MiddlewareBaseline, MiddlewareOperatorBaseline, or MiddlewareActionBaseline in a specified installed package.
 
@@ -696,10 +702,10 @@ saola baseline get default --package redis-v1 --kind operator -o yaml
 
 **Examples**:
 ```bash
-saola baseline list --package redis-v1
-saola baseline list --package redis-v1 --kind middleware
-saola baseline list --package redis-v1 --kind operator
-saola baseline list --package redis-v1 --kind action
+saola get baseline --package redis-v1
+saola get baseline --package redis-v1 --kind middleware
+saola get baseline --package redis-v1 --kind operator
+saola get baseline --package redis-v1 --kind action
 ```
 
 **Notes**:
@@ -709,15 +715,15 @@ saola baseline list --package redis-v1 --kind action
 
 ---
 
-### 3.5 Action Management (saola action)
+### 3.5 Action Management
 
-Action commands are accessed via `saola action` (alias `act`).
+Trigger operations with `saola run` and inspect results with `saola get action` or `saola describe action`; the resource alias is `act`.
 
 ---
 
-#### saola action get
+#### saola get action
 
-**Syntax**: `saola action get [name] [flags]`
+**Syntax**: `saola get action [name] [flags]`
 
 **Description**: List all MiddlewareAction resources in a namespace, or get a single resource by name.
 
@@ -732,10 +738,10 @@ Action commands are accessed via `saola action` (alias `act`).
 
 **Examples**:
 ```bash
-saola action get
-saola action get my-action-1234567890
-saola action get -A
-saola action get my-action-1234567890 -o yaml
+saola get action
+saola get action my-action-1234567890
+saola get action -A
+saola get action my-action-1234567890 -o yaml
 ```
 
 **Notes**:
@@ -744,9 +750,9 @@ saola action get my-action-1234567890 -o yaml
 
 ---
 
-#### saola action describe
+#### saola describe action
 
-**Syntax**: `saola action describe <name> [flags]`
+**Syntax**: `saola describe action <name> [flags]`
 
 **Description**: Get a MiddlewareAction by name and display its full status and event information in a human-readable format.
 
@@ -759,8 +765,8 @@ saola action get my-action-1234567890 -o yaml
 
 **Examples**:
 ```bash
-saola action describe my-action-1234567890
-saola action describe my-action-1234567890 -n my-namespace
+saola describe action my-action-1234567890
+saola describe action my-action-1234567890 -n my-namespace
 ```
 
 **Output content**:
@@ -771,9 +777,9 @@ saola action describe my-action-1234567890 -n my-namespace
 
 ---
 
-#### saola action run
+#### saola run
 
-**Syntax**: `saola action run [flags]`
+**Syntax**: `saola run <baseline> --middleware <name> [flags]`
 
 **Description**: Create a MiddlewareAction CR to trigger a one-off operation on a specified Middleware instance. The Action name is automatically generated as `<baseline>-<unix-timestamp>` to avoid conflicts.
 
@@ -782,15 +788,15 @@ saola action describe my-action-1234567890 -n my-namespace
 | Name | Short | Type | Default | Description |
 |------|-------|------|---------|-------------|
 | `--middleware` | - | string | required | Associated Middleware instance name |
-| `--baseline` | - | string | required | MiddlewareActionBaseline name |
+| `<baseline>` | - | positional | required | MiddlewareActionBaseline name |
 | `--namespace` | `-n` | string | empty | Target namespace |
 | `--params` | - | string array | empty | Operation parameters in `key=value` format, comma-separated or repeated |
 | `--wait` | - | duration | `0` (no wait) | Timeout for waiting for the operation to complete |
 
 **Examples**:
 ```bash
-saola action run --middleware my-redis --baseline redis-backup
-saola action run --middleware my-redis --baseline redis-restore --params src=backup-001 --wait 5m
+saola run redis-backup --middleware my-redis
+saola run redis-restore --middleware my-redis --params src=backup-001 --wait 5m
 ```
 
 **Notes**:
@@ -802,9 +808,9 @@ saola action run --middleware my-redis --baseline redis-restore --params src=bac
 
 ---
 
-### 3.6 Shortcut Commands
+### 3.6 Top-level Commands
 
-Shortcut commands are top-level verb-style kubectl-like commands that provide a unified entry point across resource types.
+Top-level verb commands provide a kubectl-style entry point across resource types. Package operations also have `saola package` / `saola pkg` forms.
 
 ---
 
@@ -913,8 +919,8 @@ saola get all -n my-ns
 ```
 
 **Notes**:
-- `saola get package [name]`: With a name argument, equivalent to `inspect`; without arguments, equivalent to `list`.
-- `saola get baseline [name]`: With a name argument, equivalent to `baseline get`; without arguments, equivalent to `baseline list`.
+- `saola get package [name]` reads package Secret metadata only. Without a name, it lists packages with optional `--component` and `--version` filters. Use `saola inspect <name>` to inspect archived files.
+- `saola get baseline [name]` fetches one baseline when named, or lists baselines in the package when omitted.
 - `saola get all` outputs Middlewares, Operators, and Actions in order, with separator headers between each type.
 
 ---
@@ -980,11 +986,13 @@ saola create -f operator.yaml -n production
 saola create -f middleware.yaml --dry-run
 ```
 
+File-mode `create --dry-run` reads YAML and prints kind/name only; it does not perform server-side validation or package/baseline matching.
+
 ---
 
 #### saola run
 
-`saola run` is the top-level shortcut for `saola action run`, with the baseline name passed as a positional argument.
+`saola run` triggers a one-off operation, with the baseline name passed as a positional argument.
 
 **Syntax**: `saola run <baseline> --middleware <name> [flags]`
 
@@ -1003,22 +1011,6 @@ saola create -f middleware.yaml --dry-run
 saola run redis-backup --middleware my-redis
 saola run redis-restore --middleware my-redis --params src=backup-001 --wait 5m
 ```
-
----
-
-#### saola resource
-
-`saola resource` is not a user command but an internal resource type registry module that provides alias resolution.
-
-Supported alias mappings:
-
-| Alias | Canonical Name |
-|-------|---------------|
-| `mw` | `middleware` |
-| `op` | `operator` |
-| `act` | `action` |
-| `bl` | `baseline` |
-| `pkg` | `package` |
 
 ---
 
@@ -1046,6 +1038,131 @@ Version: v1.0.0
 Git Commit: abc1234
 Build Date: 2026-01-01T00:00:00Z
 ```
+
+---
+
+### 3.7 Package Image Export and Import
+
+`saola images export <pkg-dir>` discovers image references in a local middleware package directory and exports an image archive. `saola images import <archive>` pushes archived images to a target registry. Neither command requires a Kubernetes connection. Archives produced by `saola build` do not include container images; prepare both the package and image archive for offline delivery.
+
+#### Export and transfer to an offline registry
+
+Install `skopeo` and use `skopeo login` for source registries that require authentication. Replace the example registry addresses below with your own:
+
+```bash
+skopeo login registry.example.com
+
+# List discovered images and candidates without probing or downloading
+saola images export ./redis -r registry.example.com/middleware --dry-run
+
+# Try repositories in order; preserve multi-platform manifests by default
+saola images export ./redis \
+  -r registry.example.com/middleware \
+  -r registry-backup.example.com/middleware \
+  -o redis-images.tar
+```
+
+Transfer both `redis-images.tar` and `redis-images.tar.lock.json`. The lock file preserves image names for import. If renamed or stored separately, select the matching file with `--lock-file`.
+
+On a machine that can reach the destination registry, install `skopeo`, copy both files, and run:
+
+```bash
+skopeo login registry.internal.example.com
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware --dry-run
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware
+```
+
+Images are pushed to `<repository>/<image-name>:<tag>`, for example `registry.internal.example.com/middleware/redis:7.2.4`. To load images into local Docker, use the Docker archive workflow below. Import does not update image settings in the middleware package; configure the destination repository for deployment separately.
+
+#### Choose an archive format
+
+| `--format` | Export dependency | Purpose and platform behavior |
+|------------|-------------------|-------------------------------|
+| `skopeo` (default) | skopeo | OCI archive for `saola images import`; defaults to `--platform all --multi-arch=true`, preserving multi-platform manifests |
+| `docker` | Docker or nerdctl | Single-platform archive for `docker load` / `nerdctl load`; select `--platform` explicitly |
+| `docker-multi` | skopeo | Root OCI archive requiring `linux/amd64,linux/arm64` by default; load with modern Docker using the containerd image store |
+
+```bash
+# Traditional Docker: export each platform separately
+saola images export ./redis -r registry.example.com/middleware \
+  --format docker --platform linux/amd64 -o redis-amd64.tar
+docker load -i redis-amd64.tar
+
+# Modern Docker: include both AMD64 and ARM64
+saola images export ./redis -r registry.example.com/middleware \
+  --format docker-multi --platforms linux/amd64,linux/arm64 \
+  -o redis-multi.tar
+docker load -i redis-multi.tar
+```
+
+`docker-multi` checks every image for all requested platforms and tries the next repository if a candidate lacks a platform. By default, unresolved platform requirements cause export to fail. The current `saola images import` does not accept `docker` or `docker-multi` archives; use the default `skopeo` format for offline registry delivery.
+
+#### Export flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-r, --repository` | Required | Candidate repositories, repeated or comma-separated; probed in order |
+| `-o, --output` | `<name>-<version>-images.tar` | Archive path, not a query output format |
+| `--lock-file` | `<output>.lock.json` | Output lock file path |
+| `--format` | `skopeo` | `skopeo`, `docker`, or `docker-multi` |
+| `--platform` | `all` | Platform for `skopeo` / `docker`, such as `linux/amd64` |
+| `--platforms` | `linux/amd64,linux/arm64` | Required platforms for `docker-multi` |
+| `--multi-arch` | `true` | Preserve multi-platform manifests when exporting with skopeo |
+| `--insecure` | `false` | Skip registry TLS verification; also requires skopeo with docker format |
+| `--skip-missing` | `false` | Export only resolved images, potentially producing an incomplete archive; still fails if none resolve |
+| `--dry-run` | `false` | List candidates without probing registries or writing archive/lock files |
+| `--timeout` | `30s` | Timeout for each image probe |
+
+Export uses the selected backend's login credentials and has no `--creds` flag. Log in with Docker or nerdctl when using that backend. `--insecure` does not bypass authentication.
+
+#### Import flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-r, --repository` | Required | One destination repository path |
+| `--lock-file` | `<archive>.lock.json` | Matching image lock file; missing files cause an error |
+| `--creds` | Empty | Destination credentials as `user:password`; alternatively use `skopeo login` beforehand |
+| `--platform` | `all` | Import platform, such as `linux/amd64` |
+| `--multi-arch` | `true` | Preserve multi-platform manifests when pushing |
+| `--insecure` | `false` | Skip destination registry TLS verification |
+| `--dry-run` | `false` | List destination images from an existing archive and lock file without pushing |
+
+#### Image discovery coverage
+
+Discovery renders package content using `metadata.app.version` and necessary parameter defaults. It cannot enumerate all non-default conditional branches and has no `--set` / `--values` options. For offline delivery, also inventory optional features, conditional branches, upgrade jobs, and CRD default images. Dry-run output is not a complete inventory for every deployment scenario.
+
+---
+
+### 3.8 Local Package Validation
+
+`saola validate <pkg-dir>` (equivalent to `saola package validate`) checks `metadata.yaml`, YAML documents, OpenSaola CR structure, and rendered MiddlewareConfiguration templates without connecting to a cluster. Failure returns a nonzero exit code; success reports file, document, and rendered-template counts.
+
+```bash
+saola validate ./redis
+saola package validate ./redis -o json
+```
+
+`-o, --output` accepts `table` (default summary), `yaml`, or `json`. `saola build` and `saola upgrade <pkg-dir>` validate the package before proceeding. Run validation explicitly before installation as well. Local validation does not replace deployment and middleware functional checks.
+
+### 3.9 Help and Shell Completion
+
+```bash
+saola --help
+saola help images export
+saola --lang en images export --help
+
+# Enable completion in the current Bash session
+source <(saola completion bash)
+
+# Enable completion in the current Zsh session
+# Initialize Zsh completion first if needed
+autoload -Uz compinit && compinit
+source <(saola completion zsh)
+```
+
+`saola completion fish` and `saola completion powershell` are also available. Run `saola completion <shell> --help` for persistent installation instructions. Use the installed binary's `--help` as the reference for available commands and flags.
 
 ---
 
@@ -1269,6 +1386,59 @@ saola delete operator redis-operator -n production --wait 2m
 
 ---
 
+### 6.5 Offline Package and Image Delivery
+
+This example transfers the local `./redis-pkg` directory and its images into an offline environment. Replace the source `registry.example.com/middleware` and destination `registry.internal.example.com/middleware` with your addresses. The source machine must be able to pull the images. The destination machine needs access to its internal registry and a Kubernetes cluster with OpenSaola installed. Install saola and skopeo on both machines.
+
+**Step 1: validate and export in the source environment.**
+
+```bash
+saola validate ./redis-pkg
+skopeo login registry.example.com
+saola images export ./redis-pkg -r registry.example.com/middleware --dry-run
+saola images export ./redis-pkg \
+  -r registry.example.com/middleware -o redis-images.tar
+```
+
+Dry-run lists candidate references; the next export command probes and downloads images. Also inventory optional features and non-default conditional branches; see Section 3.7 for discovery coverage.
+
+**Step 2: transfer the delivery files.** Copy these items together into the destination machine's working directory:
+
+- `redis-pkg/`: the complete package directory consumed by `saola install`.
+- `redis-images.tar`: the image archive.
+- `redis-images.tar.lock.json`: the matching image lock file.
+
+The current `install` command accepts a directory. If you also use `saola build` to create a `.pkg` delivery artifact, do not pass that file directly as the installation directory.
+
+**Step 3: import images in the destination environment.**
+
+```bash
+skopeo login registry.internal.example.com
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware --dry-run
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware
+```
+
+**Step 4: configure the image repository and install the package.** Follow the middleware package's README to configure deployment image references to match the import destination. Image import does not rewrite package or instance settings. Confirm that kubeconfig selects the intended cluster, then run:
+
+```bash
+saola validate ./redis-pkg
+saola install ./redis-pkg --name redis-offline \
+  --pkg-namespace middleware-operator --wait 5m
+saola get package redis-offline
+saola get baseline --package redis-offline --kind operator
+saola get baseline --package redis-offline --kind middleware
+
+# Select this package's baselines to create the required operator and instance
+saola create
+saola get all -n my-ns
+```
+
+`redis-offline` is the explicitly chosen package Secret name. Replace `my-ns` with the namespace selected during creation. For packages requiring a separate operator, create it before the middleware instance. After installation, check instance status and verify functionality with the middleware's protocol.
+
+---
+
 ## 7. Interactive Creation Details
 
 ### 7.1 Interactive Flow
@@ -1414,9 +1584,9 @@ saola-cli creates the following resources in the Kubernetes cluster, consumed by
 | Resource Type | Creation Method | OpenSaola Behavior |
 |--------------|-----------------|-------------------|
 | Secret (package) | `saola install` / `saola upgrade` | Watches `install` annotation, decompresses TAR, loads baseline/config/action templates |
-| Middleware CR | `saola create` / `saola middleware create` | Reconcile loop: find package -> render templates -> deploy underlying resources -> report status |
-| MiddlewareOperator CR | `saola create` / `saola operator create` | Reconcile loop: deploy operator deployment -> readiness check -> report status |
-| MiddlewareAction CR | `saola run` / `saola action run` | Reconcile loop: execute one-off operation -> report status |
+| Middleware CR | `saola create` | Reconcile loop: find package -> render templates -> deploy underlying resources -> report status |
+| MiddlewareOperator CR | `saola create` | Reconcile loop: deploy operator deployment -> readiness check -> report status |
+| MiddlewareAction CR | `saola run` | Reconcile loop: execute one-off operation -> report status |
 
 ### 10.3 Complete Data Flow Diagram
 

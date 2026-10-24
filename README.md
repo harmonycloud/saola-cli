@@ -13,6 +13,7 @@ The command-line tool for [OpenSaola](https://github.com/harmonycloud/opensaola)
 - **Interactive creation** — TUI form guides baseline selection and parameter input, no manual YAML needed
 - **Bilingual** — `--lang zh|en` switches all help text and output messages
 - **Package management** — build, install, upgrade, and uninstall middleware packages (zstd-compressed TAR)
+- **Image delivery** — discover package images, export OCI/Docker archives, and import into offline registries
 - **Instance upgrades** — annotation-driven rolling upgrades with `--wait` for completion
 - **Multiple output formats** — `table`/`yaml`/`json`/`wide`/`name` for easy scripting
 
@@ -56,7 +57,7 @@ go install github.com/harmonycloud/saola-cli/cmd/saola@latest
 
 ```bash
 # 1. Install a middleware package
-saola install ./redis-pkg -n middleware-operator --wait 5m
+saola install ./redis-pkg --pkg-namespace middleware-operator --wait 5m
 
 # 2. Interactively create Middleware and MiddlewareOperator
 saola create
@@ -75,6 +76,55 @@ saola upgrade middleware my-redis --to-version 2.0.0 -n my-ns --wait 5m
 saola delete middleware my-redis -n my-ns
 ```
 
+### Example: export images to an offline registry
+
+This example uses `./redis-pkg` as the local package directory, `registry.example.com/middleware` as the source, and `registry.internal.example.com/middleware` as the destination. Replace these paths and addresses with your own. Install `skopeo` on both the export and import machines.
+
+In the source environment:
+
+```bash
+# Validate the package and log in to the source registry
+saola validate ./redis-pkg
+skopeo login registry.example.com
+
+# Preview candidates without downloading or checking image availability
+saola images export ./redis-pkg -r registry.example.com/middleware --dry-run
+
+# Export images, preserving multi-platform manifests by default
+saola images export ./redis-pkg \
+  -r registry.example.com/middleware \
+  -o redis-images.tar
+```
+
+Copy **both `redis-images.tar` and `redis-images.tar.lock.json`** to the destination environment, then run:
+
+```bash
+skopeo login registry.internal.example.com
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware --dry-run
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware
+```
+
+The images are now in the destination registry. Configure the package's image repository for deployment separately. See the [complete offline delivery example](docs/saola-cli-usage_en.md#65-offline-package-and-image-delivery) for the remaining steps.
+
+### Example: export images for local Docker loading
+
+Use the `docker` format for a single platform. The export machine needs Docker or nerdctl; this example uses Docker:
+
+```bash
+docker login registry.example.com
+saola images export ./redis-pkg \
+  -r registry.example.com/middleware \
+  --format docker --platform linux/amd64 \
+  -o redis-amd64.tar
+
+# Run on the destination machine after copying the archive
+docker load -i redis-amd64.tar
+```
+
+For ARM64, use `linux/arm64`. To include both architectures, use `--format docker-multi --platforms linux/amd64,linux/arm64`: export requires skopeo, and the destination Docker must use the containerd image store. See [image export and import](docs/saola-cli-usage_en.md#37-package-image-export-and-import) for format details.
+
 ## Command Reference
 
 ### Top-level Commands
@@ -91,6 +141,13 @@ saola delete middleware my-redis -n my-ns
 | `uninstall` | Uninstall a middleware package |
 | `build` | Build a local directory into a zstd-compressed TAR (without installing) |
 | `inspect` | View installed package contents and metadata |
+| `images export <dir>` | Export package images as single-platform or multi-platform archives |
+| `images import <archive>` | Push an OCI image archive to a target registry |
+| `validate <dir>` | Validate a local package without a cluster connection |
+| `disable package <name>` | Disable a package while retaining its Secret and published resources |
+| `package` (`pkg`) | Package operations: build, validate, install, disable, uninstall, upgrade, list, inspect |
+| `completion` | Generate Bash, Zsh, Fish, or PowerShell completion scripts |
+| `help` | Show command help |
 | `version` | Show version information |
 
 ### Resource Subcommands
@@ -121,7 +178,7 @@ saola upgrade operator <name>   --to-version <version> [--baseline <bl>] [--wait
 
 ```bash
 # Trigger an Action (e.g., backup, restore)
-saola run <action-name> --middleware <mw-name> --params key1=val1,key2=val2 -n my-ns
+saola run <baseline> --middleware <mw-name> --params key1=val1,key2=val2 -n my-ns
 ```
 
 ## Global Flags
@@ -133,6 +190,7 @@ saola run <action-name> --middleware <mw-name> --params key1=val1,key2=val2 -n m
 | `--namespace` | `-n` | - | Target namespace |
 | `--pkg-namespace` | - | `middleware-operator` | Namespace where package Secrets reside |
 | `--lang` | - | `zh` | Language: `zh` (Chinese) / `en` (English) |
+| `--log-level` | - | `info` | Log level: debug/info/warn/error |
 | `--no-color` | - | `false` | Disable colored output |
 
 Resource commands also support:
@@ -250,6 +308,7 @@ Saola manages the following Kubernetes custom resources via the [OpenSaola](http
 ## Documentation
 
 - [Usage Guide](docs/saola-cli-usage.md) | [Usage Guide (English)](docs/saola-cli-usage_en.md)
+- [Package Image Export and Import](docs/saola-cli-usage_en.md#37-package-image-export-and-import)
 - [Testing Guide](docs/testing-guide.md) | [Testing Guide (Chinese)](docs/testing-guide_zh.md)
 - [OpenSaola Technical Documentation](https://github.com/harmonycloud/opensaola/blob/master/docs/opensaola-technical.md)
 - [Package Authoring Guide](https://github.com/harmonycloud/opensaola/blob/master/docs/opensaola-packaging.md)

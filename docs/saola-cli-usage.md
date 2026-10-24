@@ -7,7 +7,7 @@
 - [1. 概览](#1-概览)
   - [1.1 saola-cli 是什么](#11-saola-cli-是什么)
   - [1.2 核心功能](#12-核心功能)
-  - [1.3 与 OpenSaola / dataservice-baseline 的关系](#13-与-OpenSaola--dataservice-baseline-的关系)
+  - [1.3 与 OpenSaola / dataservice-baseline 的关系](#13-与-opensaola--dataservice-baseline-的关系)
   - [1.4 安装与构建](#14-安装与构建)
 - [2. 全局配置](#2-全局配置)
   - [2.1 Kubeconfig 配置](#21-kubeconfig-配置)
@@ -17,11 +17,14 @@
   - [2.5 环境变量](#25-环境变量)
 - [3. 命令参考](#3-命令参考)
   - [3.1 包管理（saola pkg）](#31-包管理saola-pkg)
-  - [3.2 中间件实例管理（saola middleware）](#32-中间件实例管理saola-middleware)
-  - [3.3 Operator 管理（saola operator）](#33-operator-管理saola-operator)
-  - [3.4 Baseline 管理（saola baseline）](#34-baseline-管理saola-baseline)
-  - [3.5 Action 管理（saola action）](#35-action-管理saola-action)
-  - [3.6 快捷命令](#36-快捷命令)
+  - [3.2 中间件实例管理](#32-中间件实例管理)
+  - [3.3 Operator 管理](#33-operator-管理)
+  - [3.4 Baseline 管理](#34-baseline-管理)
+  - [3.5 Action 管理](#35-action-管理)
+  - [3.6 顶层命令](#36-顶层命令)
+  - [3.7 中间件包镜像导出与导入](#37-中间件包镜像导出与导入)
+  - [3.8 本地包校验](#38-本地包校验)
+  - [3.9 命令帮助与 Shell 补全](#39-命令帮助与-shell-补全)
 - [4. 包（Package）规范](#4-包package规范)
   - [4.1 TAR 包格式和目录结构](#41-tar-包格式和目录结构)
   - [4.2 metadata.yaml 要求](#42-metadatayaml-要求)
@@ -35,6 +38,7 @@
   - [6.2 包生命周期](#62-包生命周期)
   - [6.3 中间件实例生命周期](#63-中间件实例生命周期)
   - [6.4 Operator 生命周期](#64-operator-生命周期)
+  - [6.5 中间件包与镜像离线交付](#65-中间件包与镜像离线交付)
 - [7. 交互式创建详解](#7-交互式创建详解)
   - [7.1 交互流程](#71-交互流程)
   - [7.2 JSON Schema 支持](#72-json-schema-支持)
@@ -49,7 +53,7 @@
   - [9.2 环境变量](#92-环境变量)
 - [10. 与其他项目的数据流](#10-与其他项目的数据流)
   - [10.1 saola-cli --> dataservice-baseline（消费包）](#101-saola-cli----dataservice-baseline消费包)
-  - [10.2 saola-cli --> OpenSaola（创建 K8s 资源）](#102-saola-cli----OpenSaola创建-k8s-资源)
+  - [10.2 saola-cli --> OpenSaola（创建 K8s 资源）](#102-saola-cli----opensaola创建-k8s-资源)
   - [10.3 完整数据流图](#103-完整数据流图)
 
 ---
@@ -102,9 +106,9 @@ make build
 
 | 变量 | 说明 |
 |------|------|
-| `Version` | git describe 标签版本，默认 `dev` |
-| `GitCommit` | git rev-parse 短 commit hash，默认 `unknown` |
-| `BuildDate` | UTC 格式构建时间，默认 `unknown` |
+| `Version` | 正式发布使用精确标签；本地 Makefile 构建使用 git describe，无法获取时回退到 `dev` |
+| `GitCommit` | 完整 Git commit hash，无法获取时回退到 `unknown` |
+| `BuildDate` | 来源提交时间转换为 UTC，无法获取时回退到 `unknown` |
 
 ---
 
@@ -212,7 +216,7 @@ saola package build ./my-redis --output ./dist/redis-v1.pkg
 | `<pkg-dir>` | - | 位置参数 | 必填 | 本地包目录路径 |
 | `--name` | - | string | `<name>-<version>` | 覆盖 Secret 名称 |
 | `--wait` | - | duration | `0`（不等待） | 等待安装完成的超时时间（如 `5m`） |
-| `--dry-run` | - | bool | `false` | 打印 Secret 清单而不实际创建 |
+| `--dry-run` | - | bool | `false` | 打包并打印目标 Secret 名称，不创建资源或输出完整 YAML |
 
 **示例**:
 ```bash
@@ -356,15 +360,15 @@ saola package list -o yaml
 
 ---
 
-### 3.2 中间件实例管理（saola middleware）
+### 3.2 中间件实例管理
 
-中间件管理命令组通过 `saola middleware`（别名 `saola mw`）访问。
+使用 `saola get middleware`、`saola describe middleware`、`saola upgrade middleware` 和 `saola delete middleware` 管理实例；资源类型可简写为 `mw`。创建使用 `saola create -f <file>`。
 
 ---
 
-#### saola middleware create
+#### saola create — Middleware
 
-**语法**: `saola middleware create [flags]`
+**语法**: `saola create -f <file> [flags]`
 
 **说明**: 从指定的 YAML 文件读取 Middleware 清单并在集群中创建。命令会自动从已安装包中查找匹配 `spec.baseline` 的 MiddlewareBaseline，并补全以下 labels 和 `spec.operatorBaseline`：
 
@@ -382,8 +386,8 @@ saola package list -o yaml
 
 **示例**:
 ```bash
-saola middleware create -f middleware.yaml
-saola middleware create -f middleware.yaml -n production
+saola create -f middleware.yaml
+saola create -f middleware.yaml -n production
 ```
 
 **注意事项**:
@@ -394,9 +398,9 @@ saola middleware create -f middleware.yaml -n production
 
 ---
 
-#### saola middleware get
+#### saola get middleware
 
-**语法**: `saola middleware get [name] [flags]`
+**语法**: `saola get middleware [name] [flags]`
 
 **说明**: 列出命名空间内的所有 Middleware 资源，或按名称获取单个资源。
 
@@ -411,10 +415,10 @@ saola middleware create -f middleware.yaml -n production
 
 **示例**:
 ```bash
-saola middleware get
-saola middleware get my-redis
-saola middleware get my-redis -o yaml
-saola middleware get -A -o json
+saola get middleware
+saola get middleware my-redis
+saola get middleware my-redis -o yaml
+saola get middleware -A -o json
 ```
 
 **注意事项**:
@@ -424,9 +428,9 @@ saola middleware get -A -o json
 
 ---
 
-#### saola middleware describe
+#### saola describe middleware
 
-**语法**: `saola middleware describe <name> [flags]`
+**语法**: `saola describe middleware <name> [flags]`
 
 **说明**: 获取单个 Middleware 资源并以可读格式输出其 spec、status 和 conditions。
 
@@ -439,8 +443,8 @@ saola middleware get -A -o json
 
 **示例**:
 ```bash
-saola middleware describe my-redis
-saola middleware describe my-redis -n production
+saola describe middleware my-redis
+saola describe middleware my-redis -n production
 ```
 
 **输出内容**:
@@ -451,9 +455,9 @@ saola middleware describe my-redis -n production
 
 ---
 
-#### saola middleware upgrade
+#### saola upgrade middleware
 
-**语法**: `saola middleware upgrade <name> [flags]`（通过 `saola upgrade middleware` 访问）
+**语法**: `saola upgrade middleware <name> [flags]`
 
 **说明**: 通过在 Middleware CR 上设置 `middleware.cn/update` 和 `middleware.cn/baseline` 注解触发 OpenSaola 执行版本升级。
 
@@ -481,9 +485,9 @@ saola upgrade mw my-redis --to-version 7.2.1 --wait 5m -n production
 
 ---
 
-#### saola middleware delete
+#### saola delete middleware
 
-**语法**: `saola middleware delete <name> [flags]`
+**语法**: `saola delete middleware <name> [flags]`
 
 **说明**: 按名称删除 Middleware 资源。资源不存在时静默跳过。
 
@@ -497,22 +501,22 @@ saola upgrade mw my-redis --to-version 7.2.1 --wait 5m -n production
 
 **示例**:
 ```bash
-saola middleware delete my-redis
-saola middleware delete my-redis -n production
-saola middleware delete my-redis --wait 2m
+saola delete middleware my-redis
+saola delete middleware my-redis -n production
+saola delete middleware my-redis --wait 2m
 ```
 
 ---
 
-### 3.3 Operator 管理（saola operator）
+### 3.3 Operator 管理
 
-Operator 管理命令组通过 `saola operator` 访问。
+使用 `saola get operator`、`saola describe operator`、`saola upgrade operator` 和 `saola delete operator` 管理 Operator；资源类型可简写为 `op`。创建使用 `saola create -f <file>`。
 
 ---
 
-#### saola operator create
+#### saola create — MiddlewareOperator
 
-**语法**: `saola operator create [flags]`
+**语法**: `saola create -f <file> [flags]`
 
 **说明**: 从 YAML 文件读取 MiddlewareOperator 清单并在集群中创建。命令会自动从已安装包中查找匹配 `spec.baseline` 的 MiddlewareOperatorBaseline，并补全四个必需的 labels。
 
@@ -525,8 +529,8 @@ Operator 管理命令组通过 `saola operator` 访问。
 
 **示例**:
 ```bash
-saola operator create -f operator.yaml
-saola operator create -f operator.yaml --namespace my-ns
+saola create -f operator.yaml
+saola create -f operator.yaml --namespace my-ns
 ```
 
 **注意事项**:
@@ -536,9 +540,9 @@ saola operator create -f operator.yaml --namespace my-ns
 
 ---
 
-#### saola operator get
+#### saola get operator
 
-**语法**: `saola operator get [name] [flags]`
+**语法**: `saola get operator [name] [flags]`
 
 **说明**: 列出或查询 MiddlewareOperator 资源。
 
@@ -553,9 +557,9 @@ saola operator create -f operator.yaml --namespace my-ns
 
 **示例**:
 ```bash
-saola operator get
-saola operator get redis-operator -n my-ns
-saola operator get -A -o yaml
+saola get operator
+saola get operator redis-operator -n my-ns
+saola get operator -A -o yaml
 ```
 
 **注意事项**:
@@ -565,9 +569,9 @@ saola operator get -A -o yaml
 
 ---
 
-#### saola operator describe
+#### saola describe operator
 
-**语法**: `saola operator describe <name> [flags]`
+**语法**: `saola describe operator <name> [flags]`
 
 **说明**: 打印 MiddlewareOperator 的完整 spec、status、conditions 及每个 operator 的 Deployment 状态。
 
@@ -580,7 +584,7 @@ saola operator get -A -o yaml
 
 **示例**:
 ```bash
-saola operator describe redis-operator -n my-ns
+saola describe operator redis-operator -n my-ns
 ```
 
 **输出内容**:
@@ -593,9 +597,9 @@ saola operator describe redis-operator -n my-ns
 
 ---
 
-#### saola operator upgrade
+#### saola upgrade operator
 
-**语法**: `saola operator upgrade <name> [flags]`（通过 `saola upgrade operator` 访问）
+**语法**: `saola upgrade operator <name> [flags]`
 
 **说明**: 通过设置 `middleware.cn/update` 和 `middleware.cn/baseline` 注解触发 Controller 执行升级。
 
@@ -625,9 +629,9 @@ saola upgrade op redis-op --to-version 1.2.0 -n my-ns --wait 5m
 
 ---
 
-#### saola operator delete
+#### saola delete operator
 
-**语法**: `saola operator delete <name> [flags]`
+**语法**: `saola delete operator <name> [flags]`
 
 **说明**: 按名称删除 MiddlewareOperator。
 
@@ -641,8 +645,8 @@ saola upgrade op redis-op --to-version 1.2.0 -n my-ns --wait 5m
 
 **示例**:
 ```bash
-saola operator delete redis-operator --namespace my-ns
-saola operator delete redis-operator -n my-ns --wait 2m
+saola delete operator redis-operator --namespace my-ns
+saola delete operator redis-operator -n my-ns --wait 2m
 ```
 
 **注意事项**:
@@ -651,15 +655,17 @@ saola operator delete redis-operator -n my-ns --wait 2m
 
 ---
 
-### 3.4 Baseline 管理（saola baseline）
+### 3.4 Baseline 管理
 
-Baseline 命令组通过 `saola baseline`（别名 `bl`）访问。
+使用 `saola get baseline [name] --package <package>` 查询 Baseline，资源类型可简写为 `bl`。
+
+按名称查询目前仅支持 `middleware` 和 `operator`；Action Baseline 使用 `saola get baseline --package <package> --kind action` 列表查询。
 
 ---
 
-#### saola baseline get
+#### saola get baseline <name>
 
-**语法**: `saola baseline get <name> [flags]`
+**语法**: `saola get baseline <name> [flags]`
 
 **说明**: 从已安装的中间件包中按名称获取单个 MiddlewareBaseline 或 MiddlewareOperatorBaseline。
 
@@ -670,19 +676,19 @@ Baseline 命令组通过 `saola baseline`（别名 `bl`）访问。
 | `<name>` | - | 位置参数 | 必填 | Baseline 名称 |
 | `--package` | - | string | 必填 | 要查询的包名 |
 | `--kind` | - | string | `middleware` | Baseline 类型：`middleware`、`operator` |
-| `--output` | `-o` | string | `yaml` | 输出格式：`table`、`yaml`、`json` |
+| `--output` | `-o` | string | `table` | 输出格式：`table`、`yaml`、`json` |
 
 **示例**:
 ```bash
-saola baseline get default --package redis-v1
-saola baseline get default --package redis-v1 --kind operator -o yaml
+saola get baseline default --package redis-v1
+saola get baseline default --package redis-v1 --kind operator -o yaml
 ```
 
 ---
 
-#### saola baseline list
+#### saola get baseline（列表）
 
-**语法**: `saola baseline list [flags]`（别名：`saola baseline ls`）
+**语法**: `saola get baseline [flags]`（别名：`saola get bl`）
 
 **说明**: 列出指定已安装包中所有 MiddlewareBaseline、MiddlewareOperatorBaseline 或 MiddlewareActionBaseline。
 
@@ -696,10 +702,10 @@ saola baseline get default --package redis-v1 --kind operator -o yaml
 
 **示例**:
 ```bash
-saola baseline list --package redis-v1
-saola baseline list --package redis-v1 --kind middleware
-saola baseline list --package redis-v1 --kind operator
-saola baseline list --package redis-v1 --kind action
+saola get baseline --package redis-v1
+saola get baseline --package redis-v1 --kind middleware
+saola get baseline --package redis-v1 --kind operator
+saola get baseline --package redis-v1 --kind action
 ```
 
 **注意事项**:
@@ -709,15 +715,15 @@ saola baseline list --package redis-v1 --kind action
 
 ---
 
-### 3.5 Action 管理（saola action）
+### 3.5 Action 管理
 
-Action 命令组通过 `saola action`（别名 `act`）访问。
+使用 `saola run` 触发操作，使用 `saola get action` 和 `saola describe action` 查看结果；资源类型可简写为 `act`。
 
 ---
 
-#### saola action get
+#### saola get action
 
-**语法**: `saola action get [name] [flags]`
+**语法**: `saola get action [name] [flags]`
 
 **说明**: 列出命名空间内的所有 MiddlewareAction，或按名称获取单个资源。
 
@@ -732,10 +738,10 @@ Action 命令组通过 `saola action`（别名 `act`）访问。
 
 **示例**:
 ```bash
-saola action get
-saola action get my-action-1234567890
-saola action get -A
-saola action get my-action-1234567890 -o yaml
+saola get action
+saola get action my-action-1234567890
+saola get action -A
+saola get action my-action-1234567890 -o yaml
 ```
 
 **注意事项**:
@@ -744,9 +750,9 @@ saola action get my-action-1234567890 -o yaml
 
 ---
 
-#### saola action describe
+#### saola describe action
 
-**语法**: `saola action describe <name> [flags]`
+**语法**: `saola describe action <name> [flags]`
 
 **说明**: 按名称获取 MiddlewareAction 并以可读格式展示其完整状态和事件信息。
 
@@ -759,8 +765,8 @@ saola action get my-action-1234567890 -o yaml
 
 **示例**:
 ```bash
-saola action describe my-action-1234567890
-saola action describe my-action-1234567890 -n my-namespace
+saola describe action my-action-1234567890
+saola describe action my-action-1234567890 -n my-namespace
 ```
 
 **输出内容**:
@@ -771,9 +777,9 @@ saola action describe my-action-1234567890 -n my-namespace
 
 ---
 
-#### saola action run
+#### saola run
 
-**语法**: `saola action run [flags]`
+**语法**: `saola run <baseline> --middleware <name> [flags]`
 
 **说明**: 创建一个 MiddlewareAction CR，对指定 Middleware 实例触发一次性运维操作。Action 名称自动生成为 `<baseline>-<unix时间戳>` 以避免冲突。
 
@@ -782,15 +788,15 @@ saola action describe my-action-1234567890 -n my-namespace
 | 名称 | 缩写 | 类型 | 默认值 | 说明 |
 |------|------|------|--------|------|
 | `--middleware` | - | string | 必填 | 关联的 Middleware 实例名 |
-| `--baseline` | - | string | 必填 | MiddlewareActionBaseline 名称 |
+| `<baseline>` | - | 位置参数 | 必填 | MiddlewareActionBaseline 名称 |
 | `--namespace` | `-n` | string | 空 | 目标命名空间 |
 | `--params` | - | string array | 空 | `key=value` 格式的操作参数，可逗号分隔或重复使用 |
 | `--wait` | - | duration | `0`（不等待） | 等待操作完成的超时时间 |
 
 **示例**:
 ```bash
-saola action run --middleware my-redis --baseline redis-backup
-saola action run --middleware my-redis --baseline redis-restore --params src=backup-001 --wait 5m
+saola run redis-backup --middleware my-redis
+saola run redis-restore --middleware my-redis --params src=backup-001 --wait 5m
 ```
 
 **注意事项**:
@@ -802,9 +808,9 @@ saola action run --middleware my-redis --baseline redis-restore --params src=bac
 
 ---
 
-### 3.6 快捷命令
+### 3.6 顶层命令
 
-快捷命令是顶层动词（verb）风格的 kubectl 式命令，提供跨资源类型的统一入口。
+顶层动词命令提供 kubectl 风格的跨资源入口；包操作还支持 `saola package` / `saola pkg` 写法。
 
 ---
 
@@ -913,8 +919,8 @@ saola get all -n my-ns
 ```
 
 **注意事项**:
-- `saola get package [name]`：有 name 参数时等同于 `inspect`；无参数时等同于 `list`。
-- `saola get baseline [name]`：有 name 参数时等同于 `baseline get`；无参数时等同于 `baseline list`。
+- `saola get package [name]` 只读取包 Secret 元数据；无 name 时列出包，可用 `--component` 和 `--version` 过滤。查看归档文件内容使用 `saola inspect <name>`。
+- `saola get baseline [name]`：有 name 时查询单个 Baseline，无 name 时列出包内 Baseline。
 - `saola get all` 按顺序输出 Middlewares、Operators、Actions，每类之间用分隔标题区分。
 
 ---
@@ -980,11 +986,13 @@ saola create -f operator.yaml -n production
 saola create -f middleware.yaml --dry-run
 ```
 
+文件模式的 `create --dry-run` 只读取 YAML 并打印 kind/name，不执行服务端校验或包与 Baseline 匹配。
+
 ---
 
 #### saola run
 
-`saola run` 是 `saola action run` 的顶层快捷版本，baseline 名称作为位置参数传入。
+`saola run` 触发一次性运维操作，baseline 名称作为位置参数传入。
 
 **语法**: `saola run <baseline> --middleware <name> [flags]`
 
@@ -1003,22 +1011,6 @@ saola create -f middleware.yaml --dry-run
 saola run redis-backup --middleware my-redis
 saola run redis-restore --middleware my-redis --params src=backup-001 --wait 5m
 ```
-
----
-
-#### saola resource
-
-`saola resource` 不是用户命令，而是内部的资源类型注册表模块，提供别名解析功能。
-
-支持的别名映射：
-
-| 别名 | 规范名称 |
-|------|----------|
-| `mw` | `middleware` |
-| `op` | `operator` |
-| `act` | `action` |
-| `bl` | `baseline` |
-| `pkg` | `package` |
 
 ---
 
@@ -1046,6 +1038,131 @@ Version: v1.0.0
 Git Commit: abc1234
 Build Date: 2026-01-01T00:00:00Z
 ```
+
+---
+
+### 3.7 中间件包镜像导出与导入
+
+`saola images export <pkg-dir>` 从本地中间件包目录发现镜像引用并导出镜像归档；`saola images import <archive>` 将归档中的镜像推送到目标仓库。两者不需要连接 Kubernetes 集群。`saola build` 生成的包文件不包含这些镜像，离线交付时需要分别准备包和镜像归档。
+
+#### 导出并交付到离线仓库
+
+安装 `skopeo`，并使用 `skopeo login` 登录需要认证的源仓库。以下仓库地址均为示例，请替换为实际地址：
+
+```bash
+skopeo login registry.example.com
+
+# 查看包中发现的镜像和候选来源，不探测仓库、不下载镜像
+saola images export ./redis -r registry.example.com/middleware --dry-run
+
+# 按声明顺序尝试候选仓库，默认保留镜像的多架构清单
+saola images export ./redis \
+  -r registry.example.com/middleware \
+  -r registry-backup.example.com/middleware \
+  -o redis-images.tar
+```
+
+成功后同时交付 `redis-images.tar` 和 `redis-images.tar.lock.json`。锁定清单保存导入所需的镜像名称；重命名或单独存放时，使用 `--lock-file` 指定对应清单。
+
+在能够访问目标仓库的机器上安装 `skopeo`，复制上述两个文件，然后执行：
+
+```bash
+skopeo login registry.internal.example.com
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware --dry-run
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware
+```
+
+导入目标为 `<目标仓库>/<镜像名>:<tag>`，例如 `registry.internal.example.com/middleware/redis:7.2.4`。`images import` 执行仓库推送；加载到本机 Docker 请使用下方的 Docker 归档方式。导入不会修改中间件包中的镜像配置，部署时仍需配置对应的目标仓库。
+
+#### 选择归档格式
+
+| `--format` | 导出依赖 | 用途与架构行为 |
+|------------|----------|----------------|
+| `skopeo`（默认） | skopeo | 供 `saola images import` 使用的 OCI 归档；默认 `--platform all --multi-arch=true` 保留多架构清单 |
+| `docker` | Docker 或 nerdctl | 单平台归档，使用 `docker load` / `nerdctl load`；显式指定 `--platform` |
+| `docker-multi` | skopeo | 根级 OCI 归档，默认要求 `linux/amd64,linux/arm64`；使用启用了 containerd image store 的现代 Docker 加载 |
+
+```bash
+# 传统 Docker：按平台分别导出
+saola images export ./redis -r registry.example.com/middleware \
+  --format docker --platform linux/amd64 -o redis-amd64.tar
+docker load -i redis-amd64.tar
+
+# 现代 Docker：同时交付 AMD64 和 ARM64
+saola images export ./redis -r registry.example.com/middleware \
+  --format docker-multi --platforms linux/amd64,linux/arm64 \
+  -o redis-multi.tar
+docker load -i redis-multi.tar
+```
+
+`docker-multi` 会检查每个镜像是否包含所有指定平台，候选仓库缺架构时尝试下一个。默认情况下，存在无法满足平台要求的镜像就会失败。`docker` 和 `docker-multi` 归档不适用于当前的 `saola images import`；需要推送离线仓库时使用默认 `skopeo` 格式。
+
+#### 导出参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `-r, --repository` | 必填 | 候选仓库，可重复或用逗号分隔，按顺序探测 |
+| `-o, --output` | `<name>-<version>-images.tar` | 镜像归档路径；此处不是查询命令的输出格式 |
+| `--lock-file` | `<output>.lock.json` | 锁定清单输出路径 |
+| `--format` | `skopeo` | `skopeo`、`docker` 或 `docker-multi` |
+| `--platform` | `all` | `skopeo` / `docker` 的平台选择，如 `linux/amd64` |
+| `--platforms` | `linux/amd64,linux/arm64` | `docker-multi` 必须包含的平台 |
+| `--multi-arch` | `true` | skopeo 导出时保留多架构清单 |
+| `--insecure` | `false` | 跳过仓库 TLS 校验；docker 格式使用此参数时也需要 skopeo |
+| `--skip-missing` | `false` | 允许仅导出已解析的镜像，产物可能不完整；全部未命中仍失败 |
+| `--dry-run` | `false` | 仅列出候选，不检查仓库是否存在镜像，也不生成归档和锁定清单 |
+| `--timeout` | `30s` | 单个镜像探测超时 |
+
+导出使用实际后端工具的登录凭据，没有 `--creds` 参数。使用 Docker 或 nerdctl 后端时，先通过对应工具登录源仓库。`--insecure` 不会跳过身份认证。
+
+#### 导入参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `-r, --repository` | 必填 | 单个目标仓库路径 |
+| `--lock-file` | `<archive>.lock.json` | 与归档匹配的镜像锁定清单，缺失时报错 |
+| `--creds` | 空 | 目标仓库凭据，格式 `user:password`；也可预先执行 `skopeo login` |
+| `--platform` | `all` | 导入平台，如 `linux/amd64` |
+| `--multi-arch` | `true` | 推送时保留多架构清单 |
+| `--insecure` | `false` | 跳过目标仓库 TLS 校验 |
+| `--dry-run` | `false` | 从已有归档及锁定清单列出目标镜像，不推送 |
+
+#### 镜像发现范围
+
+当前发现逻辑基于 `metadata.app.version` 和 necessary 参数默认值渲染包内容，不能穷举非默认条件分支，也没有 `--set` / `--values` 参数。离线交付前需另外盘点可选功能、条件分支、升级任务和 CRD 默认镜像；`--dry-run` 输出不等于所有场景的完整镜像清单。
+
+---
+
+### 3.8 本地包校验
+
+`saola validate <pkg-dir>`（等价于 `saola package validate`）检查 `metadata.yaml`、YAML 文档、OpenSaola CR 结构和 MiddlewareConfiguration 模板渲染结果，不连接集群。校验失败返回非零退出码；通过时输出文件、文档和已渲染模板的统计。
+
+```bash
+saola validate ./redis
+saola package validate ./redis -o json
+```
+
+`-o, --output` 支持 `table`（默认摘要）、`yaml`、`json`。`saola build` 和 `saola upgrade <pkg-dir>` 会先执行包校验；安装前也可以显式运行上述命令。此校验不代替实际部署和中间件功能验收。
+
+### 3.9 命令帮助与 Shell 补全
+
+```bash
+saola --help
+saola help images export
+saola --lang en images export --help
+
+# 为当前 Bash 会话启用补全
+source <(saola completion bash)
+
+# 为当前 Zsh 会话启用补全
+# 首次使用时先初始化 Zsh 补全
+autoload -Uz compinit && compinit
+source <(saola completion zsh)
+```
+
+还支持 `saola completion fish` 和 `saola completion powershell`。使用 `saola completion <shell> --help` 查看对应 Shell 的持久化安装说明。命令与参数以当前二进制的 `--help` 为准。
 
 ---
 
@@ -1269,6 +1386,59 @@ saola delete operator redis-operator -n production --wait 2m
 
 ---
 
+### 6.5 中间件包与镜像离线交付
+
+本例将本地 `./redis-pkg` 及其镜像交付到离线环境。源仓库为 `registry.example.com/middleware`，目标为 `registry.internal.example.com/middleware`，请替换为实际地址。源机器能拉取镜像；目标机器能访问内网镜像仓库及已安装 OpenSaola 的 Kubernetes 集群。两台机器均安装 saola 和 skopeo。
+
+**第一步：源环境检查并导出。**
+
+```bash
+saola validate ./redis-pkg
+skopeo login registry.example.com
+saola images export ./redis-pkg -r registry.example.com/middleware --dry-run
+saola images export ./redis-pkg \
+  -r registry.example.com/middleware -o redis-images.tar
+```
+
+`--dry-run` 用于检查候选引用，真正的镜像探测和下载发生在下一条导出命令。另行核对可选功能和非默认条件分支的镜像，发现范围见第 3.7 节。
+
+**第二步：传递交付内容。** 将以下内容一起复制到目标机器的工作目录：
+
+- `redis-pkg/`：完整中间件包目录，供 `saola install` 使用。
+- `redis-images.tar`：镜像归档。
+- `redis-images.tar.lock.json`：与归档匹配的镜像锁定清单。
+
+当前 `install` 接受包目录。若另用 `saola build` 生成 `.pkg` 作为交付制品，不要直接把 `.pkg` 路径当作安装目录传入。
+
+**第三步：目标环境导入镜像。**
+
+```bash
+skopeo login registry.internal.example.com
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware --dry-run
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware
+```
+
+**第四步：配置镜像仓库并安装包。** 按该中间件包的 README 配置实际使用的镜像仓库，使部署引用与上一步导入目标一致；`images import` 不会自动改写包或实例配置。确认 kubeconfig 指向目标集群后执行：
+
+```bash
+saola validate ./redis-pkg
+saola install ./redis-pkg --name redis-offline \
+  --pkg-namespace middleware-operator --wait 5m
+saola get package redis-offline
+saola get baseline --package redis-offline --kind operator
+saola get baseline --package redis-offline --kind middleware
+
+# 交互式选择该包的 Baseline，创建所需 Operator 和中间件实例
+saola create
+saola get all -n my-ns
+```
+
+`redis-offline` 是本例显式指定的包 Secret 名称；`my-ns` 替换为创建实例时选择的命名空间。需要独立 Operator 的包先创建 Operator，再创建中间件实例。包安装成功后，还需检查实例状态并按中间件协议验证可用性。
+
+---
+
 ## 7. 交互式创建详解
 
 ### 7.1 交互流程
@@ -1414,9 +1584,9 @@ saola-cli 在 Kubernetes 集群中创建以下资源，由 OpenSaola 消费：
 | 资源类型 | 创建方式 | OpenSaola 行为 |
 |----------|----------|-------------------|
 | Secret（包） | `saola install` / `saola upgrade` | 监听 `install` annotation，解压 TAR，加载 baseline/config/action 模板 |
-| Middleware CR | `saola create` / `saola middleware create` | Reconcile 循环：查找包 -> 渲染模板 -> 部署底层资源 -> 状态上报 |
-| MiddlewareOperator CR | `saola create` / `saola operator create` | Reconcile 循环：部署 operator deployment -> 就绪检查 -> 状态上报 |
-| MiddlewareAction CR | `saola run` / `saola action run` | Reconcile 循环：执行一次性操作 -> 状态上报 |
+| Middleware CR | `saola create` | Reconcile 循环：查找包 -> 渲染模板 -> 部署底层资源 -> 状态上报 |
+| MiddlewareOperator CR | `saola create` | Reconcile 循环：部署 operator deployment -> 就绪检查 -> 状态上报 |
+| MiddlewareAction CR | `saola run` | Reconcile 循环：执行一次性操作 -> 状态上报 |
 
 ### 10.3 完整数据流图
 

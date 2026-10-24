@@ -462,7 +462,11 @@ func TestExportImages_FormatDockerMultiBuildsLoadableOCIRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open archive: %v", err)
 	}
-	defer archive.Close()
+	t.Cleanup(func() {
+		if err := archive.Close(); err != nil {
+			t.Errorf("close archive: %v", err)
+		}
+	})
 	entries := map[string]bool{}
 	reader := tar.NewReader(archive)
 	for {

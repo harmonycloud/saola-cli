@@ -13,6 +13,7 @@
 - **交互式创建** — TUI 表单引导选择 Baseline、填写参数，无需手写 YAML
 - **中英双语** — `--lang zh|en` 切换所有命令帮助和输出信息
 - **包管理** — 打包、安装、升级、卸载中间件包（zstd 压缩 TAR 格式）
+- **镜像交付** — 发现包依赖镜像，导出 OCI/Docker 归档并导入离线仓库
 - **实例升级** — 通过 annotation 触发 controller 执行滚动升级，支持 `--wait` 等待完成
 - **多格式输出** — `table`/`yaml`/`json`/`wide`/`name`，便于脚本集成
 
@@ -56,7 +57,7 @@ go install github.com/harmonycloud/saola-cli/cmd/saola@latest
 
 ```bash
 # 1. 安装中间件包
-saola install ./redis-pkg -n middleware-operator --wait 5m
+saola install ./redis-pkg --pkg-namespace middleware-operator --wait 5m
 
 # 2. 交互式创建 Middleware 和 MiddlewareOperator
 saola create
@@ -75,6 +76,55 @@ saola upgrade middleware my-redis --to-version 2.0.0 -n my-ns --wait 5m
 saola delete middleware my-redis -n my-ns
 ```
 
+### 使用例子：导出镜像到离线仓库
+
+假设本地包目录为 `./redis-pkg`，源仓库为 `registry.example.com/middleware`，目标离线仓库为 `registry.internal.example.com/middleware`。将这些路径和地址替换为实际值。导出与导入机器都需要安装 `skopeo`。
+
+在源环境执行：
+
+```bash
+# 检查包并登录源仓库
+saola validate ./redis-pkg
+skopeo login registry.example.com
+
+# 预览镜像候选；此步骤不下载或验证镜像是否存在
+saola images export ./redis-pkg -r registry.example.com/middleware --dry-run
+
+# 导出镜像，默认保留多架构清单
+saola images export ./redis-pkg \
+  -r registry.example.com/middleware \
+  -o redis-images.tar
+```
+
+把生成的 **`redis-images.tar` 和 `redis-images.tar.lock.json` 两个文件一起**复制到目标环境，然后执行：
+
+```bash
+skopeo login registry.internal.example.com
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware --dry-run
+saola images import redis-images.tar \
+  -r registry.internal.example.com/middleware
+```
+
+导入完成后，镜像位于目标仓库；部署时还需将包使用的镜像仓库配置指向该地址。更多交付步骤见[离线交付完整例子](docs/saola-cli-usage.md#65-中间件包与镜像离线交付)。
+
+### 使用例子：导出后加载到本机 Docker
+
+单架构机器使用 `docker` 格式，导出端需要 Docker 或 nerdctl；以下以 Docker 为例：
+
+```bash
+docker login registry.example.com
+saola images export ./redis-pkg \
+  -r registry.example.com/middleware \
+  --format docker --platform linux/amd64 \
+  -o redis-amd64.tar
+
+# 将归档复制到目标机器后执行
+docker load -i redis-amd64.tar
+```
+
+ARM64 机器将平台改为 `linux/arm64`。同时交付 AMD64 和 ARM64 时使用 `--format docker-multi --platforms linux/amd64,linux/arm64`：导出端需要 skopeo，加载端 Docker 必须启用 containerd image store。三种格式的区别见[镜像导出与导入](docs/saola-cli-usage.md#37-中间件包镜像导出与导入)。
+
 ## 命令参考
 
 ### 顶级命令
@@ -91,6 +141,13 @@ saola delete middleware my-redis -n my-ns
 | `uninstall` | 卸载中间件包 |
 | `build` | 打包本地目录为 zstd 压缩 TAR（不安装） |
 | `inspect` | 查看已安装包的内容和元数据 |
+| `images export <dir>` | 导出中间件包依赖镜像，支持单架构与多架构归档 |
+| `images import <archive>` | 将 OCI 镜像归档推送到目标仓库 |
+| `validate <dir>` | 本地校验包结构及模板，无需连接集群 |
+| `disable package <name>` | 禁用包，保留 Secret 和已发布资源 |
+| `package` (`pkg`) | 包操作：build、validate、install、disable、uninstall、upgrade、list、inspect |
+| `completion` | 生成 Bash、Zsh、Fish 或 PowerShell 补全脚本 |
+| `help` | 查看命令帮助 |
 | `version` | 显示版本信息 |
 
 ### 资源子命令
@@ -121,7 +178,7 @@ saola upgrade operator <name>   --to-version <version> [--baseline <bl>] [--wait
 
 ```bash
 # 触发 Action（如备份、恢复）
-saola run <action-name> --middleware <mw-name> --params key1=val1,key2=val2 -n my-ns
+saola run <baseline> --middleware <mw-name> --params key1=val1,key2=val2 -n my-ns
 ```
 
 ## 全局 Flags
@@ -133,6 +190,7 @@ saola run <action-name> --middleware <mw-name> --params key1=val1,key2=val2 -n m
 | `--namespace` | `-n` | - | 目标命名空间 |
 | `--pkg-namespace` | - | `middleware-operator` | 包 Secret 所在命名空间 |
 | `--lang` | - | `zh` | 语言：`zh`（中文）/ `en`（英文） |
+| `--log-level` | - | `info` | 日志级别：debug/info/warn/error |
 | `--no-color` | - | `false` | 禁用彩色输出 |
 
 常用资源命令还支持：
@@ -250,6 +308,7 @@ Saola 通过 [OpenSaola](https://github.com/harmonycloud/opensaola) Operator 管
 ## 文档
 
 - [使用文档](docs/saola-cli-usage.md) | [Usage Guide (English)](docs/saola-cli-usage_en.md)
+- [中间件包镜像导出与导入](docs/saola-cli-usage.md#37-中间件包镜像导出与导入)
 - [测试指南](docs/testing-guide_zh.md) | [Testing Guide (English)](docs/testing-guide.md)
 - [OpenSaola 技术文档](https://github.com/harmonycloud/opensaola/blob/master/docs/opensaola-technical.md)
 - [包适配指南](https://github.com/harmonycloud/opensaola/blob/master/docs/opensaola-packaging.md)
